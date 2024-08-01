@@ -1,0 +1,16 @@
+Flask==3.0.3
+Flask-mail==0.9.1
+Flask-SQLAlchemy==3.1.1
+flask_testing==0.8.1
+Flask-login==0.6.3
+Flask-buzz==3.1.0
+Flask-migrate==4.0.7
+Flask-cors==4.0.1
+
+requests==2.31.0
+google-auth-oauthlib==1.2.0
+pyjwt==2.8.0
+
+prettytable==3.10.0
+matplotlib==3.9.0
+asciichartpy==1.5.25

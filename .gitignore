@@ -1,0 +1,9 @@
+qvenv/
+main_storage/
+test_storage/
+__pycache__/
+.vscode/
+env_local.json
+env_test.json
+env.json
+
