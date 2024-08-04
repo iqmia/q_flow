@@ -15,9 +15,10 @@ class Config(object):
     # Flask settings
     DEBUG = False
     TESTING = False
+    LOG_LEVEL = 'DEBUG'  # CRITICAL / ERROR / WARNING / INFO / DEBUG
 
     # Folders and Files
-    STORAGE_PATH = '/home/iqmieeuk/q_auth/main_storage'  # full path to the storage directory
+    STORAGE_PATH = '/home/iqmieeuk/q_flow/main_storage'  # full path to the storage directory
     PROJECT_PHOTOS = 'project_photos' # in the STORAGE_PATH (see file_sys.py)
     ALLOWED_IMAGES = {
         'png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff', 'bmp', 'svg', 'ico'
@@ -39,7 +40,7 @@ class Config(object):
     MAIL_DOMAIN = 'snaghere.com'
 
     # JWT settings
-    USER_API_URL = 'http://quollnet.com/api/user'
+    USER_API_URL = 'https://quollnet.com/api/user/'
     GOOGLE_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
 
     # Load secret keys from file
@@ -60,10 +61,12 @@ class LocalConfig(Config):
     DEBUG = True
     TESTING = False
     STORAGE_PATH = 'c:/user/esaad/code/q_flow/main_storage'
-    USER_API_URL = 'http://localhost:5000/user'
+    # USER_API_URL = 'http://localhost:5000/user/'
+    USER_API_URL = 'https://quollnet.com/api/user'
     
     # Load secret keys from file
-    ENV_FILE = 'env_local.json'
+    # ENV_FILE = 'env_local.json'
+    ENV_FILE = 'env.json'
     data = get_env(ENV_FILE)
     SECRET_KEY = data.get('SECRET_KEY', '')
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')

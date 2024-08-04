@@ -14,9 +14,10 @@ from q_flow.extensions import db, fs, lg, u_api, mail, er, cors
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
     fs.init_app(app)
-    db.init_app(app)
     lg.init_app(app)
+    db.init_app(app)
     u_api.init_app(app)
     mail.init_app(app)
     er.init_app(app)
@@ -27,6 +28,9 @@ def create_app(config_class=Config):
     from q_flow.routes.projects import projects
     from q_flow.routes.activities import activities
     from q_flow.routes.users import users
+    from logging import getLogger
+    log = getLogger(__name__)
+    log.debug('Routes registered')
     app.register_blueprint(projects)
     app.register_blueprint(activities)
     app.register_blueprint(users)

@@ -1,6 +1,9 @@
+import logging
 from flask import Flask, current_app
 import jwt
 import requests
+
+log = logging.getLogger(__name__)
 
 class U_Api_resp:
     def __init__(self, status_code, message):
@@ -55,6 +58,7 @@ class User_API:
             else:
                 usr_resp.message = response.text
             usr_resp.response = response
+        print(usr_resp.message)
         return usr_resp
 
     def get(self, route, data=None) -> U_Api_resp:
@@ -81,7 +85,17 @@ class User_API:
     def verify_token(self, token: str) -> dict:
         '''
         decodes the token using the public key and returns the user info
+        user: dict {
+            email: str,
+            name: str,
+            role: str,
+            user_id: str,
+            client_app_id: str,
+            is_active: bool
+        }
         '''
+        log.debug(f"Verifying token {token}")
+        log.debug(f"algo: {self.algo}")
         if current_app.config.get("TESTING"):
             return {
                 "email": "test@exampl.com",
@@ -97,11 +111,10 @@ class User_API:
                 token, self.public_key, algorithms=[self.algo])
             for key, value in tokenDict.items():
                 resp[key] = value
-                
+
             # check if client_app_id is the same as the app_id
             if resp.get("client_app_id") != self.app_id:
                 resp["error"] = "Invalid Application"
-
         except jwt.ExpiredSignatureError:
             print("expiry error")
             resp = {"error": "Token Expired"}
@@ -110,8 +123,9 @@ class User_API:
         except ValueError:
             resp = {"error": "Error Decoding Token, wrong public key"}
         except Exception as e:
+            print(f"Error Decoding Token: {str(e.__class__.__name__)}")
             resp = {"error": f"Failed Decoding Token: {str(e.__class__.__name__)}"}
-
-        print(resp)
-
+        if not resp.get("error"):
+            if resp.get("name") is None or "":
+                resp["name"] = resp.get("email").split("@")[0]
         return resp

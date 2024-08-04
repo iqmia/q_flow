@@ -7,9 +7,9 @@ from q_flow.services.logger import QLogger
 from q_flow.services.user_api import User_API
 from flask_mail import Mail
 
+lg = QLogger()
 db = SQLAlchemy()
 fs = FileSys()
-lg = QLogger()
 u_api = User_API()
 mail = Mail()
 er = ErrHandler()

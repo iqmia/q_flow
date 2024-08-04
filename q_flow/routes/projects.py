@@ -1,3 +1,4 @@
+import logging
 import os
 from flask import Blueprint, jsonify, request, send_file
 from werkzeug.datastructures import FileStorage
@@ -9,6 +10,8 @@ from q_flow.extensions import fs
 
 projects = Blueprint('projects', __name__)
 
+log = logging.getLogger(__name__)
+
 @projects.route('/api', methods=['GET'])
 def api():
     return jsonify(
@@ -19,6 +22,7 @@ def api():
 @projects.route('/projects')
 @auth_required
 def get_projects(user):
+    log.info(f'User {user.get("name")} requested projects')
     data = read_data(request)
     page = data.get('page', 1, int)
     per_page = data.get('per_page', 10, int)
@@ -30,6 +34,7 @@ def get_projects(user):
 @projects.route('/new_project', methods=['POST'])
 @auth_required
 def new_project(user):
+    log.info(f'User {user.get("name")} requested to create a new project')
     data = read_data(request)
     photo: FileStorage = request.files.get('photo')
     MissingData.require_condition(data.get('name'), 'Missing name')
@@ -44,6 +49,7 @@ def new_project(user):
 @projects.route('/project/<project_id>')
 @auth_required
 def get_project(user, project_id):
+    log.info(f'User {user.get("name")} requested project {project_id}')
     project: Project = Project.query.get(project_id)
     ProjectNotFound.require_condition(project and not project.is_deleted, 'Project not found')
     PermissionDenied.require_condition(
@@ -53,6 +59,7 @@ def get_project(user, project_id):
 @projects.route('/delete_project/<project_id>', methods=['DELETE'])
 @auth_required
 def delete_project(user, project_id):
+    log.info(f'User {user.get("name")} requested to delete project {project_id}')
     project: Project = Project.query.get(project_id)
     ProjectNotFound.require_condition(project and not project.is_deleted, 'Project not found')
     PermissionDenied.require_condition(
@@ -63,6 +70,7 @@ def delete_project(user, project_id):
 @projects.route('/hard_delete_project/<project_id>', methods=['DELETE'])
 @auth_required
 def hard_delete_project(user, project_id):
+    log.info(f'User {user.get("name")} requested to hard delete project {project_id}')
     project: Project = Project.query.get(project_id)
     ProjectNotFound.require_condition(project and not project.is_deleted, 'Project not found')
     PermissionDenied.require_condition(
@@ -73,6 +81,7 @@ def hard_delete_project(user, project_id):
 @projects.route('/update_project/<project_id>', methods=['PUT'])
 @auth_required
 def update_project(user, project_id):
+    log.info(f'User {user.get("name")} requested to update project {project_id}')
     project: Project = Project.query.get(project_id)
     ProjectNotFound.require_condition(project and not project.is_deleted, 'Project not found')
     PermissionDenied.require_condition(
@@ -85,6 +94,7 @@ def update_project(user, project_id):
 @projects.route('/restore_project/<project_id>', methods=['PUT'])
 @auth_required
 def restore_project(user, project_id):
+    log.info(f'User {user.get("name")} requested to restore project {project_id}')
     project: Project = Project.query.get(project_id)
     ProjectNotFound.require_condition(project, 'Project not found')
     ProjectNotDeleted.require_condition(project.is_deleted, 'Project is not deleted')

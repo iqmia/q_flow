@@ -5,7 +5,7 @@ from q_flow.extensions import u_api
 
 def auth_required(f):
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args, **kwargs) -> dict:
         print("Auth decorator started")
         token = request.headers.get("Authorization")
         TokenNotFound.require_condition(
