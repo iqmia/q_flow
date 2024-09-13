@@ -61,12 +61,12 @@ class LocalConfig(Config):
     DEBUG = True
     TESTING = False
     STORAGE_PATH = 'c:/user/esaad/code/q_flow/main_storage'
-    # USER_API_URL = 'http://localhost:5000/user/'
-    USER_API_URL = 'https://quollnet.com/api/user'
+    USER_API_URL = 'http://localhost:5000/user/'
+    # USER_API_URL = 'https://quollnet.com/api/user'
     
     # Load secret keys from file
     # ENV_FILE = 'env_local.json'
-    ENV_FILE = 'env.json'
+    ENV_FILE = 'env_local.json'
     data = get_env(ENV_FILE)
     SECRET_KEY = data.get('SECRET_KEY', '')
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')

@@ -1,6 +1,7 @@
 import json
 import logging
 from flask import Blueprint, current_app, jsonify, request
+from flask.json import loads
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from matplotlib.font_manager import json_dump
@@ -163,6 +164,7 @@ def resend_verify_code():
 def google_login():
     log.info("User requested to login with google")
     data = read_data(request)
+    print(f"Data: {data}")
     client_platform = data.get('platform')
     user_info = None
     if client_platform != 'web':
@@ -171,19 +173,30 @@ def google_login():
         try:
             id_info = id_token.verify_oauth2_token(
                 code, requests.Request(), audience=audience, clock_skew_in_seconds=1)
-            print(id_info)
-            user_info = dict(
-                email=id_info.get('email'),
-                name=id_info.get('name'),
-                picture=id_info.get('picture')
-            )
+            user_info = {
+                'email': id_info.get('email'),
+                'name': id_info.get('name'),
+                'picture': id_info.get('picture')
+            }
         except ValueError as e:
             return jsonify(dict(error='Invalid token', message=str(e))), 400
+        print(f"User info: {user_info}")
+        print(type(user_info))
     else:
-        user_info = data.get('user_info')
-    resp =  u_api.post('oauth_login', data=dict(
-        oauth='google', verify_email=False, user_info = json.dumps(user_info)
-    ))
+        user_info = loads(data.get('user_info'))
+        print(f"User info: {user_info}")
+        print(type(user_info))
+        print("==================== end =====================")
+        
+    resp =  u_api.post(
+        'oauth_login', 
+        data={
+            'oauth':'google',
+            'verify_email': False, 
+            'user_info': {'email': user_info.get('email'), 'name': user_info.get('name')},
+            }
+        )
+    
     token = resp.response.json().get('data').get('token')
     user = u_api.verify_token(token)
     log.info(f"User {user.get('name')} logged in with google")

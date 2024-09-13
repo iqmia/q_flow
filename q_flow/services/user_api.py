@@ -1,5 +1,6 @@
 import logging
 from flask import Flask, current_app
+from flask.json import dumps
 import jwt
 import requests
 
@@ -37,28 +38,27 @@ class User_API:
 
     def post(self, route, data=None, files=None) -> U_Api_resp:
         usr_resp = U_Api_resp(200, "Success")
-        print(self.url_of(route))
         try:
             response = requests.post(
                 self.url_of(route),
-                data=data,
+                json=data if not files else None,
+                data=data if files else None,
                 files=files,
-                headers={
-                    'client-app-id': self.app_id,})
-        except requests.RequestException as e:
-            usr_resp.status_code = 500
-            usr_resp.message = str(e)
-        except Exception as e:
-            usr_resp.status_code = 500
-            usr_resp.message = str(e)
-        else:
+                headers={'client-app-id': self.app_id},
+            )
             usr_resp.status_code = response.status_code
             if "application/json" in response.headers.get("content-type"):
                 usr_resp.message = response.json().get("message")
             else:
                 usr_resp.message = response.text
             usr_resp.response = response
-        print(usr_resp.message)
+        except requests.RequestException as e:
+            usr_resp.status_code = 500
+            usr_resp.message = f"Request Error: {str(e)}"
+        except Exception as e:
+            usr_resp.status_code = 500
+            usr_resp.message = f"General Error: {str(e)}"
+
         return usr_resp
 
     def get(self, route, data=None) -> U_Api_resp:

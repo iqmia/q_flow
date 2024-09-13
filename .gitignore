@@ -6,4 +6,5 @@ __pycache__/
 env_local.json
 env_test.json
 env.json
+act.sh
 /logs/
