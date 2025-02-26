@@ -1,3 +1,7 @@
+'''
+This Module contains custom exceptions for the application
+'''
+
 from flask_buzz import FlaskBuzz
 
 class Q_ERROR(FlaskBuzz):

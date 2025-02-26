@@ -3,6 +3,16 @@ from functools import wraps
 from q_flow.exceptions import PermissionDenied, TokenNotFound
 from q_flow.extensions import u_api
 
+
+# user is a dict with user data in the following format:
+# {
+#     "user_id": str,
+#     "name": str,
+#     "email": str,
+#     "role": str,
+#     "is_active": bool,
+#     "client_app_id": str
+# }
 def auth_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs) -> dict:

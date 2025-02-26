@@ -1,17 +1,17 @@
-import json
-import logging
+from logging import getLogger
 from flask import Blueprint, current_app, jsonify, request
-from flask.json import loads
-from google.auth.transport import requests
+from google.auth.transport import requests as g_requests
 from google.oauth2 import id_token
-from matplotlib.font_manager import json_dump
+import requests
+from q_flow.exceptions import InvalidCredentials
+from q_flow.services.decorators import auth_required
 from q_flow.services.user_api import U_Api_resp
 from q_flow.extensions import u_api
 from q_flow.services.utils import read_data
 
 users = Blueprint('users', __name__)
 
-log = logging.getLogger(__name__)
+log = getLogger(__name__)
 
 @users.route('/api', methods=['GET'])
 def api():
@@ -160,49 +160,72 @@ def resend_verify_code():
             message=resp.message,
         )), resp.status_code
 
+@users.route('/delete_account', methods=['POST'])
+@users.route('/deactivate_account', methods=['POST'])
+@auth_required
+def deactivate_account(user):
+    log.info(f"User {user.get('name')} requested to deactivate account")
+    resp: U_Api_resp = u_api.post(
+        'deactivate_user', data=dict(id=user.get('user_id')))
+    if resp.error:
+        log.info(f"User {user.get('name')} account deactivation failed")
+        return jsonify(
+            dict(
+                error=resp.error,
+                message=resp.message,
+            )), resp.status_code
+    return jsonify(
+        dict(
+            message=resp.message,
+        )), resp.status_code
+
 @users.route('/google_login', methods=['PUT'])
 def google_login():
     log.info("User requested to login with google")
     data = read_data(request)
-    print(f"Data: {data}")
     client_platform = data.get('platform')
     user_info = None
-    if client_platform != 'web':
-        code = data.get('code')
-        audience = current_app.config['GOOGLE_CLIENT_ID']
-        try:
+    idToken = data.get('idToken')
+    access_token = data.get('accessToken')
+    audience = current_app.config['GOOGLE_CLIENT_ID']
+    front_end_user_info = data.get('user_info')
+    log.info(f"user trying to login with google on {client_platform}")
+    try:
+        if idToken:
             id_info = id_token.verify_oauth2_token(
-                code, requests.Request(), audience=audience, clock_skew_in_seconds=1)
-            user_info = {
-                'email': id_info.get('email'),
-                'name': id_info.get('name'),
-                'picture': id_info.get('picture')
+                idToken, g_requests.Request(), audience=audience, clock_skew_in_seconds=1)
+        elif access_token:
+            id_info = requests.get(
+                f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}"
+            ).json()
+        else:
+            return jsonify(dict(error='Invalid token', message='No token provided')), 400
+        InvalidCredentials.require_condition(
+            id_info.get('email'), "Invalid email from google token")
+        user_info = {
+                'email': id_info.get('email', front_end_user_info.get('email')),
+                'name': id_info.get('name', front_end_user_info.get('name')),
+                'picture': id_info.get('picture', front_end_user_info.get('picture'))
             }
-        except ValueError as e:
-            return jsonify(dict(error='Invalid token', message=str(e))), 400
-        print(f"User info: {user_info}")
-        print(type(user_info))
-    else:
-        user_info = loads(data.get('user_info'))
-        print(f"User info: {user_info}")
-        print(type(user_info))
-        print("==================== end =====================")
-        
+    except ValueError as e:
+        return jsonify(dict(error='Invalid token', message=str(e))), 400
+
     resp =  u_api.post(
         'oauth_login', 
-        data={
-            'oauth':'google',
-            'verify_email': False, 
-            'user_info': {'email': user_info.get('email'), 'name': user_info.get('name')},
-            }
+        data={'oauth':'google', 'verify_email': False,  'user_info': user_info}
         )
-    
+    if resp.error:
+        return jsonify(dict(error=resp.error, message=resp.message)), resp.status_code
     token = resp.response.json().get('data').get('token')
     user = u_api.verify_token(token)
     log.info(f"User {user.get('name')} logged in with google")
     return jsonify(
-        dict(
-            message=resp.message,
-            data = {'token': token, 'user': user},
-        )), resp.status_code
+        dict(message=resp.message,
+            data = {'token': token, 'user': user},)), resp.status_code
 
+@users.route('/callback/google', methods=['POST'])
+def google_callback():
+    print("callback from google")
+    data = read_data(request)
+    print(data)
+    return jsonify(dict(message='Google callback received')), 200

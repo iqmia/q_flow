@@ -1,8 +1,8 @@
 import logging
 from flask import Flask, current_app
-from flask.json import dumps
 import jwt
 import requests
+from requests.exceptions import ConnectionError, Timeout, HTTPError
 
 log = logging.getLogger(__name__)
 
@@ -14,24 +14,23 @@ class U_Api_resp:
 
     @property
     def error(self):
-        return self.status_code >= 301
+        return self.status_code >= 400
 
 class User_API:
     def init_app(self, app: Flask):
         self.app = app
-        self.url = app.config.get("USER_API_URL")
-        self.app_name = app.config.get("APP_NAME")
-        self.app_id = app.config.get("APP_ID")
-        self.public_key = app.config.get("PUBLIC_KEY")
-        self.algo = app.config.get("ALGO")
+        self.url = app.config.get("USER_API_URL", "")
+        self.app_name = app.config.get("APP_NAME", "")
+        self.app_id = app.config.get("APP_ID", "")
+        self.public_key = app.config.get("PUBLIC_KEY", "")
+        self.algo = app.config.get("ALGO", "HS256")
 
     def __init__(self):
-
-        self.url: str = ""
+        self.url = ""
         self.app_name = ""
-        self.app_id: str = ""
-        self.public_key: str = ""
-        self.algo: str = ""
+        self.app_id = ""
+        self.public_key = ""
+        self.algo = "HS256"
 
     def url_of(self, route):
         return f"{self.url}/{route}"
@@ -45,87 +44,92 @@ class User_API:
                 data=data if files else None,
                 files=files,
                 headers={'client-app-id': self.app_id},
+                timeout=10
             )
+            # response.raise_for_status()
             usr_resp.status_code = response.status_code
-            if "application/json" in response.headers.get("content-type"):
-                usr_resp.message = response.json().get("message")
-            else:
-                usr_resp.message = response.text
+            usr_resp.message = response.json().get("message", "Success")
             usr_resp.response = response
+        except ConnectionError:
+            usr_resp.status_code = 503
+            usr_resp.message = "Service Unavailable: Unable to connect to qAuth."
+        except Timeout:
+            usr_resp.status_code = 408
+            usr_resp.message = "Request Timeout: API took too long to respond."
+        except HTTPError as e:
+            usr_resp.status_code = e.response.status_code
+            usr_resp.message = f"HTTP Error: {e.response.text}"
         except requests.RequestException as e:
             usr_resp.status_code = 500
-            usr_resp.message = f"Request Error: {str(e)}"
-        except Exception as e:
-            usr_resp.status_code = 500
-            usr_resp.message = f"General Error: {str(e)}"
-
+            usr_resp.message = f"Request Exception: {str(e)}"
         return usr_resp
 
     def get(self, route, data=None) -> U_Api_resp:
-        url = self.url_of(route)
         usr_resp = U_Api_resp(200, "Success")
         try:
             response = requests.get(
-                url=url,
+                self.url_of(route),
                 params=data,
                 headers={'client-app-id': self.app_id},
+                timeout=10
             )
-        except Exception as e:
-            usr_resp.status_code = 500
-            usr_resp.message = str(type(e).__name__)
-        else:
+            response.raise_for_status()
             usr_resp.status_code = response.status_code
-            if "application/json" in response.headers.get("content-type"):
-                usr_resp.message = response.json().get("message")
-            else:
-                usr_resp.message = response.text
+            usr_resp.message = response.json().get("message", "Success")
             usr_resp.response = response
+        except ConnectionError:
+            usr_resp.status_code = 503
+            usr_resp.message = "Service Unavailable: Unable to connect to qAuth."
+        except Timeout:
+            usr_resp.status_code = 408
+            usr_resp.message = "Request Timeout: API took too long to respond."
+        except HTTPError as e:
+            usr_resp.status_code = e.response.status_code
+            usr_resp.message = f"HTTP Error: {e.response.text}"
+        except requests.RequestException as e:
+            usr_resp.status_code = 500
+            usr_resp.message = f"Request Exception: {str(e)}"
         return usr_resp
 
     def verify_token(self, token: str) -> dict:
-        '''
-        decodes the token using the public key and returns the user info
-        user: dict {
-            email: str,
-            name: str,
-            role: str,
-            user_id: str,
-            client_app_id: str,
-            is_active: bool
-        }
-        '''
         log.debug(f"Verifying token {token}")
-        log.debug(f"algo: {self.algo}")
+        log.debug(f"Algorithm: {self.algo}")
+
         if current_app.config.get("TESTING"):
             return {
-                "email": "test@exampl.com",
+                "email": "test@example.com",
                 "name": "Test User",
                 "role": "test",
-                "user_id": '1',
+                "user_id": "1",
                 "client_app_id": self.app_id,
                 "is_active": True
-                }
-        resp: dict = {}
+            }
+        
+        resp = {}
         try:
-            tokenDict = jwt.decode(
-                token, self.public_key, algorithms=[self.algo])
-            for key, value in tokenDict.items():
-                resp[key] = value
-
-            # check if client_app_id is the same as the app_id
+            decoded_token = jwt.decode(token, self.public_key, algorithms=[self.algo])
+            resp.update(decoded_token)
+            
             if resp.get("client_app_id") != self.app_id:
-                resp["error"] = "Invalid Application"
+                return {"error": "Invalid Application"}
         except jwt.ExpiredSignatureError:
-            print("expiry error")
-            resp = {"error": "Token Expired"}
-        except jwt.InvalidTokenError as e:
-            resp = {"error": f"Invalid Token {str(e)}"}
+            log.warning("Token expired, attempting to refresh...")
+            refresh_resp = self.post("refresh_token", data={"refresh_token": token})
+            if refresh_resp.error:
+                return {"error": refresh_resp.message}
+            new_token = refresh_resp.response.json().get("data", {}).get("token")
+            return self.verify_token(new_token)
+        except jwt.DecodeError:
+            return {"error": "Invalid Token: Cannot decode"}
+        except jwt.InvalidTokenError:
+            return {"error": "Invalid Token: Token is malformed or invalid"}
         except ValueError:
-            resp = {"error": "Error Decoding Token, wrong public key"}
+            return {"error": "Decoding Error: Wrong public key"}
         except Exception as e:
-            print(f"Error Decoding Token: {str(e.__class__.__name__)}")
-            resp = {"error": f"Failed Decoding Token: {str(e.__class__.__name__)}"}
-        if not resp.get("error"):
-            if resp.get("name") is None or "":
-                resp["name"] = resp.get("email").split("@")[0]
+            log.error(f"Unexpected error during token verification: {str(e)}")
+            return {"error": f"Unexpected error: {str(e)}"}
+        
+        if not resp.get("name"):
+            resp["name"] = resp.get("email", "").split("@")[0]
+        
         return resp

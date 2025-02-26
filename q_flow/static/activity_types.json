@@ -1,8 +1,8 @@
-
 {
     "concrete": {
         "type": "concrete",
         "name": "Concrete",
+        "description": "Concrete work in construction, including foundations, walls, and slabs.",
         "advance": 0.1,
         "subcontracted": 0.5,
         "retention": 0.1,
@@ -18,6 +18,7 @@
     "piling": {
         "type": "piling",
         "name": "Piling",
+        "description": "Piling work to support and stabilize the structure.",
         "advance": 0.1,
         "subcontracted": 0.9,
         "retention": 0.1,
@@ -33,6 +34,7 @@
     "excavation": {
         "type": "excavation",
         "name": "Excavation",
+        "description": "Excavation work involving digging and earth removal.",
         "advance": 0.0,
         "subcontracted": 1.0,
         "retention": 0.1,
@@ -48,6 +50,7 @@
     "civil": {
         "type": "civil",
         "name": "Civil Works",
+        "description": "General civil engineering works including infrastructure.",
         "advance": 0.1,
         "subcontracted": 0.7,
         "retention": 0.1,
@@ -63,6 +66,7 @@
     "wood_work": {
         "type": "woodwork",
         "name": "Wood Works",
+        "description": "Woodworking related to construction, such as carpentry.",
         "advance": 0.2,
         "subcontracted": 0.9,
         "retention": 0.1,
@@ -78,6 +82,7 @@
     "facade": {
         "type": "facade",
         "name": "Facade",
+        "description": "Facade work including external building finishes.",
         "advance": 0.1,
         "subcontracted": 0.9,
         "retention": 0.1,
@@ -93,6 +98,7 @@
     "mep": {
         "type": "mep",
         "name": "MEP Works",
+        "description": "Mechanical, Electrical, and Plumbing (MEP) installations.",
         "advance": 0.1,
         "subcontracted": 0.95,
         "retention": 0.1,
@@ -108,6 +114,7 @@
     "steel": {
         "type": "steel",
         "name": "Steel Works",
+        "description": "Steelwork for structural framework and reinforcement.",
         "advance": 0.1,
         "subcontracted": 0.9,
         "retention": 0.1,
@@ -123,6 +130,7 @@
     "finishing": {
         "type": "finishing",
         "name": "Finishing Works",
+        "description": "Finishing work including painting, tiling, and plastering.",
         "advance": 0.1,
         "subcontracted": 0.7,
         "retention": 0.1,
@@ -138,6 +146,7 @@
     "generalLine": {
         "type": "linear",
         "name": "A Linear Flow",
+        "description": "Work involving a linear flow or process in the project.",
         "advance": 0.1,
         "subcontracted": 0.5,
         "retention": 0.1,
@@ -153,6 +162,7 @@
     "general_curve": {
         "type": "general",
         "name": "A Curved Flow",
+        "description": "Work involving a curved flow or process in the project.",
         "advance": 0.1,
         "subcontracted": 0.5,
         "retention": 0.1,

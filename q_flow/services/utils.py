@@ -51,7 +51,9 @@ def read_data(req: Request):
         return req.get_json()
     if req.form:
         return req.form.to_dict()
-    return req.data
+    if req.data:
+        return req.data
+    return None
 
 
 def get_env(file_path: str) -> dict:
