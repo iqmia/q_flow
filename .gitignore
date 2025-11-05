@@ -8,3 +8,4 @@ env_test.json
 env.json
 act.sh
 /logs/
+/migrate/

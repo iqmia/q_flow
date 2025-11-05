@@ -1,4 +1,5 @@
 from os import path
+from re import A
 from flask import json
 
 
@@ -49,6 +50,8 @@ class Config(object):
     SECRET_KEY = data.get('SECRET_KEY', '')
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')
     APP_ID = data.get('APP_ID', '')
+    APP_SECRET = data.get('APP_SECRET', '')
+    APP_ALGO = data.get('APP_ALGO', '')
     PUBLIC_KEY = data.get('PUBLIC_KEY', '')
     ALGO = data.get('ALGO', '')
     GOOGLE_CLIENT_ID = data.get('GOOGLE_CLIENT_ID', '')
@@ -71,6 +74,8 @@ class LocalConfig(Config):
     SECRET_KEY = data.get('SECRET_KEY', '')
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')
     APP_ID = data.get('APP_ID', '')
+    APP_SECRET = data.get('APP_SECRET', '')
+    APP_ALGO = data.get('APP_ALGO', '')
     PUBLIC_KEY = data.get('PUBLIC_KEY', '')
     ALGO = data.get('ALGO', '')
 

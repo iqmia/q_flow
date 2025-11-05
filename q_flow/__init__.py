@@ -7,7 +7,8 @@ The file env.json is used to store the secret keys
 2. SECRET_KEY: This key is used by flask to secure the session.
 '''
 
-from flask import Config, Flask
+from json import dumps
+from flask import Config, Flask, jsonify, g
 from q_flow.command import create_cf
 from q_flow.extensions import db, fs, lg, u_api, mail, er, cors
 
@@ -24,6 +25,14 @@ def create_app(config_class=Config):
     cors.init_app(app)
     app.cli.add_command(create_cf)
 
+    # @app.after_request
+    # def add_token_to_response(response):
+    #     if hasattr(g, "new_token"):
+    #         response_data = response.get_json()
+    #         if response_data:
+    #             response_data["token"] = g.new_token
+    #             response.set_data(dumps(response_data))
+    #     return response
 
     from q_flow.routes.projects import projects
     from q_flow.routes.activities import activities
