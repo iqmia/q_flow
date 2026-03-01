@@ -378,6 +378,8 @@ class User_API:
             return self.verify_token(new_tok)
         except jwt.InvalidSignatureError:
             return {"error": "Invalid Token Signature"}
+        except jwt.InvalidAudienceError:
+            return {"error": "Invalid Audience: Token not meant for this app"}
         except jwt.DecodeError:
             return {"error": "Invalid Token: Cannot decode"}
         except jwt.InvalidTokenError as e:
