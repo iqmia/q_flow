@@ -355,7 +355,7 @@ class User_API:
             return {"error": "Token not provided"}
 
         try:
-            decoded = jwt.decode(token, self.public_key, algorithms=[self.algo])
+            decoded = jwt.decode(token, self.public_key, algorithms=[self.algo], audience=self.app_id)
             # App binding safety check
             if decoded.get("client_app_id") != self.app_id:
                 return {"error": "Invalid Application"}
