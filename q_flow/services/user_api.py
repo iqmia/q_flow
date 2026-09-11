@@ -158,6 +158,7 @@ Required app.config keys:
 Optional:
     TESTING       (bool) – When True, verify_token returns a test user
 """
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -198,7 +199,8 @@ class User_API:
 
     def init_app(self, app: Flask) -> None:
         self.app = app
-        self.url = app.config.get("USER_API_URL", "")
+        self.url = app.config.get("QAUTH_URL") or app.config.get("USER_API_URL", "")
+        self.url = self._normalize_base_url(self.url)
         self.app_name = app.config.get("APP_NAME", "")
         self.app_id = app.config.get("APP_ID", "")
         self.public_key = app.config.get("PUBLIC_KEY", "")
@@ -241,14 +243,24 @@ class User_API:
             data = response.get_json(silent=True)
             if isinstance(data, dict):
                 data["token"] = new
-                response.set_data(current_app.response_class.response_class.dumps(data))
+                response.set_data(json.dumps(data))
+                response.headers["Content-Type"] = "application/json"
         except Exception:
             # Non-JSON or immutable body – header is already set
             pass
         return response
 
     def _build_url(self, route: str) -> str:
-        return f"{self.url.rstrip('/')}/{route.lstrip('/')}"
+        base = self._normalize_base_url(self.url)
+        return f"{base}/{route.lstrip('/')}"
+
+    @staticmethod
+    def _normalize_base_url(url: str) -> str:
+        """Accept the legacy USER_API_URL ending in /user as a QAuth base URL."""
+        base = (url or "").rstrip("/")
+        if base.endswith("/user"):
+            base = base[:-5]
+        return base
 
     def _app_token(self) -> str:
         """Return a short-lived JWT for the `client-app-id` header.
@@ -365,27 +377,27 @@ class User_API:
             return decoded
         except jwt.ExpiredSignatureError:
             log.warning("Token expired; attempting refresh")
-            refresh = self.post("user/refresh_token", data={"refresh_token": token})
+            refresh = self.post("user/get_fresh_token", token=token)
             if refresh.error:
-                return {"error": refresh.message}
+                return {"error": refresh.message, "code": "reauth_required"}
             try:
                 new_tok = refresh.response.json().get("data", {}).get("token")
             except Exception:
                 new_tok = None
             if not new_tok:
-                return {"error": "Token refresh failed"}
+                return {"error": "Token refresh failed", "code": "reauth_required"}
             g.new_token = new_tok
             return self.verify_token(new_tok)
         except jwt.InvalidSignatureError:
-            return {"error": "Invalid Token Signature"}
+            return {"error": "Invalid Token Signature", "code": "reauth_required"}
         except jwt.InvalidAudienceError:
-            return {"error": "Invalid Audience: Token not meant for this app"}
+            return {"error": "Invalid Audience: Token not meant for this app", "code": "reauth_required"}
         except jwt.DecodeError:
-            return {"error": "Invalid Token: Cannot decode"}
+            return {"error": "Invalid Token: Cannot decode", "code": "reauth_required"}
         except jwt.InvalidTokenError as e:
-            return {"error": f"Invalid Token: {e}"}
+            return {"error": f"Invalid Token: {e}", "code": "reauth_required"}
         except ValueError:
-            return {"error": "Error Decoding Token: wrong public key"}
+            return {"error": "Error Decoding Token: wrong public key", "code": "reauth_required"}
         except Exception as e:
             log.error(f"Unexpected verify_token error: {e}")
-            return {"error": f"Unexpected error: {e}"}
+            return {"error": f"Unexpected error: {e}", "code": "reauth_required"}

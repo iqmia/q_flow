@@ -22,8 +22,14 @@ def auth_required(f):
             token and token.startswith("Bearer "), "Missing Authorization header (Token)")
         token = token.split(" ")[1]
         user = u_api.verify_token(token)
-        PermissionDenied.require_condition(not user.get("error"), user.get("error"))
+        if user.get("error"):
+            return jsonify(
+                code=user.get("code", "reauth_required"),
+                message=user.get("error"),
+            ), 401
         PermissionDenied.require_condition(user.get("is_active"), "User is not active")
+        PermissionDenied.require_condition(
+            user.get("app_user_active", True), "User is not active for this app")
         print("auth decorator passed")
         return f(user, *args, **kwargs)
     return decorated_function

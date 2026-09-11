@@ -10,7 +10,7 @@ class Test_Decorators(Base, TestCase):
         print("setting up decorators test")
 
     def test_user_required_fail(self):
-        r = self.client.get("/qf/activities")
+        r = self.client.get("/activity/activity_id")
         print(r.data)
         self.assertEqual(r.status_code, 403)
 

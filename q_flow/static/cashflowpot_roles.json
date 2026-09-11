@@ -1,0 +1,43 @@
+{
+  "permissions": [
+    {
+      "name": "view:cashflow",
+      "description": "View a project's cashflow profile, activities, and forecast."
+    },
+    {
+      "name": "edit:cashflow",
+      "description": "Create and change a project's cashflow profile and activities."
+    }
+  ],
+  "roles": [
+    {
+      "name": "creator",
+      "description": "Created the project and has full control.",
+      "grants": ["*"]
+    },
+    {
+      "name": "admin",
+      "description": "Manages the project, members, roles, and cashflow without changing its creator.",
+      "grants": [
+        "edit:unit", "view:unit", "activate:unit", "deactivate:unit",
+        "invite:member", "leave:unit", "add:member", "delete:unit",
+        "add:role", "deactivate:role", "activate:role", "delete:role",
+        "edit:role", "view:role", "add:permission", "edit:permission",
+        "delete:permission", "view:permission", "deactivate:permission",
+        "assign:permission", "activate:permission", "view:member",
+        "remove:member", "edit:member", "deactivate:member",
+        "view:cashflow", "edit:cashflow"
+      ]
+    },
+    {
+      "name": "editor",
+      "description": "Can view and edit the project cashflow.",
+      "grants": ["view:unit", "edit:unit", "leave:unit", "view:cashflow", "edit:cashflow"]
+    },
+    {
+      "name": "viewer",
+      "description": "Can view the project cashflow without changing it.",
+      "grants": ["view:unit", "leave:unit", "view:cashflow"]
+    }
+  ]
+}

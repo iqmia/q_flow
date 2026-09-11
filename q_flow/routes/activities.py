@@ -5,11 +5,17 @@ from q_flow.exceptions import MissingData, PermissionDenied, ProjectNotFound
 from q_flow.models.activity import Activity, ActivityType
 from q_flow.models.project import Project
 from q_flow.services.decorators import auth_required
+from q_flow.services.units import EDIT_CASHFLOW, VIEW_CASHFLOW, ensure_unit_permission
 from q_flow.services.utils import check_required, read_data
 from logging import getLogger
 
 activities = Blueprint('activities', __name__)
 log = getLogger(__name__)
+
+
+def _permission_error(user, project_id, permission):
+    result = ensure_unit_permission(user, project_id, permission)
+    return result if isinstance(result, tuple) else None
 
 
 @activities.route('/activities', methods=['GET'])
@@ -30,11 +36,15 @@ def new_activity(user, project_id):
     log.info(f"{user.get('name')} requested to create a new activity")
     data = read_data(request)
     check_required(data, ['name', 'cost', 'duration'])
+    project = Project.Identify(project_id)
+    ProjectNotFound.require_condition(project, 'Project not found')
+    error = _permission_error(user, project_id, EDIT_CASHFLOW)
+    if error:
+        return error
     activity = Activity()
     activity.project_id = project_id
     MissingData.require_condition(
         data.get('name') and data.get("cost"), 'Missing name or cost')
-    ProjectNotFound.require_condition(Project.Identify(project_id), 'Project not found')
     activity.from_dict(data, user.get('user_id')).commit()
     if activity.skew == 0 or activity.skew == None:
         activity.skew = ActivityType.skew_by_code(activity.activity_type)
@@ -48,8 +58,9 @@ def get_activity(user, activity_id):
     activity = Activity.query.get(activity_id)
     PermissionDenied.require_condition(
         activity and not activity.is_deleted, 'Activity not found')
-    PermissionDenied.require_condition(
-        activity.project.created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
+    error = _permission_error(user, activity.project_id, VIEW_CASHFLOW)
+    if error:
+        return error
     return jsonify(data=activity.as_dict(), message='Activity retrieved successfully'), 200
 
 @activities.route('/update_activity/<activity_id>', methods=['PUT'])
@@ -61,9 +72,10 @@ def update_activity(user, activity_id):
     check_required(data, ['name', 'cost', 'duration'])
     PermissionDenied.require_condition(
         activity and not activity.is_deleted, 'Activity not found')
-    PermissionDenied.require_condition(
-        activity.project.created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
-    activity.update(user.get('id'), **data)
+    error = _permission_error(user, activity.project_id, EDIT_CASHFLOW)
+    if error:
+        return error
+    activity.update(user.get('user_id'), **data)
     if activity.skew == 0 or activity.skew == None:
         activity.skew = ActivityType.skew_by_code(activity.activity_type)
     Activity_cf(activity).set_cashflow()
@@ -77,8 +89,9 @@ def delete_activity(user, activity_id):
     activity = Activity.query.get(activity_id)
     PermissionDenied.require_condition(
         activity and not activity.is_deleted, 'Activity not found')
-    PermissionDenied.require_condition(
-        activity.project.created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
+    error = _permission_error(user, activity.project_id, EDIT_CASHFLOW)
+    if error:
+        return error
     activity.delete()
     return jsonify(message='Activity deleted successfully'), 200
 
@@ -88,8 +101,9 @@ def hard_delete_activity(user, activity_id):
     log.info(f"{user.get('name')} requested to hard delete activity {activity_id}")
     activity = Activity.query.get(activity_id)
     PermissionDenied.require_condition(activity, 'Activity not found')
-    PermissionDenied.require_condition(
-        activity.project.created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
+    error = _permission_error(user, activity.project_id, EDIT_CASHFLOW)
+    if error:
+        return error
     activity.hard_delete()
     return jsonify(message='Activity hard deleted successfully'), 200
 
@@ -99,8 +113,9 @@ def restore_activity(user, activity_id):
     log.info(f"{user.get('name')} requested to restore activity {activity_id}")
     activity = Activity.query.get(activity_id)
     PermissionDenied.require_condition(activity, 'Activity not found')
-    PermissionDenied.require_condition(
-        activity.created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
+    error = _permission_error(user, activity.project_id, EDIT_CASHFLOW)
+    if error:
+        return error
     activity.is_deleted = False
     activity.commit()
     return jsonify(message='Activity restored successfully'), 200
@@ -113,9 +128,11 @@ def restore_activities(user):
     actList = data.get("data")
     log.info(f"{user.get('name')} requested to restore activities {actList}")
     activities = Activity.query.filter(Activity.id.in_(actList)).all()
+    for project_id in {activity.project_id for activity in activities}:
+        error = _permission_error(user, project_id, EDIT_CASHFLOW)
+        if error:
+            return error
     for activity in activities:
-        if activity.created_by != user.get('user_id'):
-            continue
         activity.is_deleted = False
         activity.commit()
     return jsonify(message='Activities restored successfully'), 200
@@ -126,8 +143,8 @@ def restore_activities(user):
 def get_deleted_activities(user, projectId):
     log.info(f"{user.get('name')} requested deleted activities for project {projectId}")
     ProjectNotFound.require_condition(Project.Identify(projectId), 'Project not found')
-    PermissionDenied.require_condition(
-        Project.Identify(projectId).created_by == user.get('user_id'), f'Permission denied for user {user.get("name")}')
+    error = _permission_error(user, projectId, VIEW_CASHFLOW)
+    if error:
+        return error
     activities = Activity.query.filter_by(project_id=projectId, is_deleted=True).all()
     return jsonify(data=[activity.as_dict() for activity in activities]), 200
-

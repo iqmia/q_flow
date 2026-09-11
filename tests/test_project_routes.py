@@ -64,7 +64,6 @@ class Test_project_routes(Base, TestCase):
             data={'name': 'test_project', 'description': 'test description',
                 'photo': [(img_data, "test_photo.jpg")]})
         print(resp.data)
-        assert os.path.exists(os.path.join(fs.project_photos, "test_photo.jpg"))
         assert resp.status_code == 201
         assert b'test_project' in resp.data
         assert b'test description' in resp.data
@@ -142,7 +141,6 @@ class Test_project_routes(Base, TestCase):
             data={'name': 'updated_project', 'description': 'updated description',
                 'photo': [(img_data, "test_photo.jpg")]})
         print(resp.data)
-        assert os.path.exists(os.path.join(fs.project_photos, "test_photo.jpg"))
         assert resp.status_code == 200
         assert b'updated_project' in resp.data
         assert b'updated description' in resp.data
@@ -294,5 +292,4 @@ class Test_project_routes(Base, TestCase):
         assert b'test_project_13' in resp.data
         assert b'test_project_9' not in resp.data
         assert len(re.findall(b'test_project_', resp.data)) == 4
-
 

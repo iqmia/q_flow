@@ -84,7 +84,7 @@ class TestConfig(Config):
     Test configurations
     '''
     TESTING = True
-    STORAGE_PATH = 'c:/user/esaad/code/q_flow/test_storage'
+    STORAGE_PATH = path.join(path.dirname(path.dirname(__file__)), 'test_storage')
     JWT_EXP_DELTA_SECONDS = 60
 
     USER_API_URL = 'http://localhost:5000/user'
@@ -97,4 +97,3 @@ class TestConfig(Config):
     APP_ID = data.get('APP_ID', '')
     PUBLIC_KEY = data.get('PUBLIC_KEY', '')
     ALGO = data.get('ALGO', '')
-
