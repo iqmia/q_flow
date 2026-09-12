@@ -44,18 +44,19 @@ class Cashflow(db.Model, BaseMixin):
     def as_dict_with_activities(self):
         from q_flow.cashflow import CashflowCalculator
 
-        active_activities = [a for a in self.activities if not a.is_deleted]
-        if active_activities:
-            calculator = CashflowCalculator(self)
-            inflow = calculator.inflow()
-            outflow = calculator.outflow()
-        else:
-            inflow = [0.0]
-            outflow = [0.0]
+        active_activities = [
+            activity for activity in self.activities if not activity.is_deleted
+        ]
+        calculator = CashflowCalculator(self)
+        activities = []
+        for activity in active_activities:
+            data = activity.as_dict()
+            data["cash_flow_json"] = calculator.activity_cashflows[activity.id]
+            activities.append(data)
+
         data = super().as_dict()
         data.update({
-            "activities": [activity.as_dict() for activity in active_activities],
-            "inflow": inflow,
-            "outflow": outflow,
+            "activities": activities,
+            **calculator.snapshot(),
         })
         return data
