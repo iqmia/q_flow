@@ -109,6 +109,15 @@ def test_cashflow_crud_is_scoped_to_parent_unit(app):
 
     assert created.status_code == 201
     assert fetched.status_code == 200
+    for response in (created, fetched, updated):
+        snapshot = response.get_json()["data"]
+        assert snapshot["activities"] == []
+        assert snapshot["workflow"] == []
+        assert snapshot["inflow"] == []
+        assert snapshot["outflow"] == []
+        assert snapshot["netflow"] == []
+        assert snapshot["outflow_with_interest"] == []
+        assert snapshot["duration"] == 0
     assert updated.get_json()["data"]["name"] == "Bank Financing"
     assert updated.get_json()["data"]["contract_value"] == 1_250_000
     assert all(call.args[1] == "unit-1" for call in permission.call_args_list)
@@ -149,3 +158,28 @@ def test_hard_delete_project_removes_all_local_cashflows_after_qauth(app):
     with app.app_context():
         assert Cashflow.query.filter_by(unit_id="unit-1").count() == 0
         assert Activity.query.count() == 0
+
+
+def test_invalid_cashflow_update_is_rolled_back(app):
+    with app.app_context():
+        cashflow = Cashflow(
+            id="cf-atomic",
+            unit_id="unit-1",
+            name="Original",
+            created_by="owner-1",
+            contract_value=1000,
+        ).commit()
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().put(
+            "/cashflow/cf-atomic",
+            headers=_auth(),
+            json={"name": "Should not persist", "interest_rate": "invalid"},
+        )
+
+    assert result.status_code == 400
+    with app.app_context():
+        cashflow = Cashflow.query.get("cf-atomic")
+        assert cashflow.name == "Original"
+        assert cashflow.interest_rate == 0.005
