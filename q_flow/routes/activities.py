@@ -87,8 +87,16 @@ def _validate_activity(activity):
 
 
 def _apply_activity_updates(activity, data, user_id):
+    protected = {
+        "id",
+        "project_id",
+        "created_at",
+        "created_by",
+        "cash_flow_json",
+        "is_deleted",
+    }
     for key in activity.__table__.columns.keys():
-        if key in data:
+        if key in data and key not in protected:
             setattr(activity, key, data[key])
     activity.updated_by = user_id
     activity.updated_at = func.now()
@@ -162,6 +170,8 @@ def new_activity(user, cashflow_id):
     activity = Activity()
     activity.cashflow_id = cashflow_id
     activity.from_dict(data, user.get("user_id"))
+    activity.cashflow_id = cashflow_id
+    activity.is_deleted = False
     db.session.add(activity)
     snapshot = _finalize_mutation(
         cashflow, activity=activity, use_type_skew=True
