@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -102,6 +102,30 @@ def test_migration_creates_database_backup(app, runner, legacy_project):
     backups = list(Path(app.config["STORAGE_PATH"]).glob("q_flow.db.backup-*"))
     assert len(backups) == 1
     assert backups[0].stat().st_size > 0
+
+
+def test_deleted_legacy_project_becomes_inactive_unit_with_active_cashflow(
+        app, runner, legacy_project):
+    with app.app_context():
+        cashflow = db.session.get(Cashflow, legacy_project)
+        cashflow.is_deleted = True
+        db.session.commit()
+
+    with patch(
+        "q_flow.commands.migrate_project_cashflows.create_unit_for_owner",
+        return_value=({"id": legacy_project}, False),
+    ), patch(
+        "q_flow.commands.migrate_project_cashflows.u_api.post",
+        return_value=Mock(error=False),
+    ) as deactivate:
+        result = runner.invoke(
+            args=["migrate-projects-to-cashflows", "--execute"])
+
+    assert result.exit_code == 0, result.output
+    deactivate.assert_called_once_with(
+        "unit/admin/deactivate", data={"unit_id": legacy_project})
+    with app.app_context():
+        assert db.session.get(Cashflow, legacy_project).is_deleted is False
 
 
 def test_migration_reports_failure_and_continues(app, runner, legacy_project):
