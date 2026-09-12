@@ -206,3 +206,123 @@ class Test_activity_routes(Base, TestCase):
                 headers={"Authorization": "Bearer test"})
         print(r.data)
         assert r.status_code == 200
+
+
+    def _create_activity(self, **overrides):
+        payload = {"name": "activity 1", "cost": 1000, "duration": 4}
+        payload.update(overrides)
+        return self.client.post(
+            f"/new_activity/{self.project.id}",
+            headers={"Authorization": "Bearer test"},
+            json=payload,
+        )
+
+    def _assert_snapshot(self, response, activity_count):
+        cashflow = response.json["cashflow"]
+        assert len(cashflow["activities"]) == activity_count
+        assert set((
+            "workflow",
+            "inflow",
+            "outflow",
+            "netflow",
+            "outflow_with_interest",
+            "duration",
+        )).issubset(cashflow)
+
+    def test_activity_mutations_return_authoritative_cashflow(self):
+        created = self._create_activity(
+            activity_type="linear",
+            duration=2,
+            mobilization_period=0,
+            subcontracted=0,
+        )
+        assert created.status_code == 201
+        self._assert_snapshot(created, 1)
+        activity_id = created.json["data"]["id"]
+        marginal = created.json["cashflow"]["activities"][0]["cash_flow_json"]
+        assert marginal["marginal_work"] == [500.0, 500.0]
+        assert marginal["marginal_out_flow"] == [500.0, 500.0, 0.0, 0.0]
+
+        updated = self.client.put(
+            f"/update_activity/{activity_id}",
+            headers={"Authorization": "Bearer test"},
+            json={
+                "name": "updated",
+                "cost": 2000,
+                "duration": 2,
+                "activity_type": "linear",
+                "mobilization_period": 0,
+                "subcontracted": 0,
+            },
+        )
+        assert updated.status_code == 200
+        self._assert_snapshot(updated, 1)
+        assert updated.json["cashflow"]["workflow"] == [1000.0, 1000.0]
+
+        deleted = self.client.delete(
+            f"/delete_activity/{activity_id}",
+            headers={"Authorization": "Bearer test"},
+        )
+        assert deleted.status_code == 200
+        self._assert_snapshot(deleted, 0)
+        assert deleted.json["cashflow"]["workflow"] == []
+
+        restored = self.client.put(
+            f"/restore_activity/{activity_id}",
+            headers={"Authorization": "Bearer test"},
+        )
+        assert restored.status_code == 200
+        self._assert_snapshot(restored, 1)
+
+    def test_restore_activities_returns_affected_cashflow_snapshots(self):
+        first = self._create_activity(name="first").json["data"]["id"]
+        second = self._create_activity(name="second").json["data"]["id"]
+        Activity.query.get(first).delete()
+        Activity.query.get(second).delete()
+
+        response = self.client.put(
+            "/restore_activities",
+            headers={"Authorization": "Bearer test"},
+            json={"data": [first, second]},
+        )
+
+        assert response.status_code == 200
+        assert len(response.json["cashflows"]) == 1
+        assert len(response.json["cashflows"][0]["activities"]) == 2
+
+    def test_invalid_activity_create_is_rolled_back(self):
+        before = Activity.query.count()
+
+        response = self._create_activity(skew=1)
+
+        assert response.status_code == 400
+        assert Activity.query.count() == before
+
+    def test_invalid_activity_update_is_rolled_back(self):
+        created = self._create_activity()
+        activity_id = created.json["data"]["id"]
+
+        response = self.client.put(
+            f"/update_activity/{activity_id}",
+            headers={"Authorization": "Bearer test"},
+            json={
+                "name": "should not persist",
+                "cost": 2000,
+                "duration": 4,
+                "skew": -1,
+            },
+        )
+
+        assert response.status_code == 400
+        activity = Activity.query.get(activity_id)
+        assert activity.name == "activity 1"
+        assert activity.cost == 1000
+        assert activity.skew == 0
+
+    def test_negative_duration_is_rejected_without_persisting(self):
+        before = Activity.query.count()
+
+        response = self._create_activity(duration=-1)
+
+        assert response.status_code == 400
+        assert Activity.query.count() == before
