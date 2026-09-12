@@ -82,9 +82,17 @@ def new_cashflow(user, unit_id):
     MissingData.require_condition(data.get("name"), "Missing cashflow name")
     cashflow = Cashflow().from_dict(data, user.get("user_id"))
     cashflow.unit_id = unit_id
-    cashflow.commit()
+    db.session.add(cashflow)
+    try:
+        db.session.flush()
+        _validate_cashflow(cashflow)
+        snapshot = cashflow.as_dict_with_activities()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return jsonify(
-        data=cashflow.as_dict_with_activities(),
+        data=snapshot,
         message="Cashflow created successfully",
     ), 201
 
