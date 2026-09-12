@@ -1,29 +1,28 @@
-
 from flask_testing import TestCase
 from sqlalchemy import create_engine, inspect
-from q_flow.extensions import u_api
 
 from tests.base import Base
+
 
 class Test_Decorators(Base, TestCase):
     def setUp(self):
         print("setting up decorators test")
+        super().setUp()
 
     def test_user_required_fail(self):
-        r = self.client.get("/activity/activity_id")
-        print(r.data)
-        self.assertEqual(r.status_code, 403)
+        response = self.client.get("/activities/types")
+
+        self.assertEqual(response.status_code, 403)
+        self.verify_token_mock.assert_not_called()
 
     def test_user_required_success(self):
-        print(u_api.url)
-        r1 = u_api.post(
-            "register",
-            data={"email": "test@example.com", "password": "test"})
-        print(r1.message)
+        response = self.client.get(
+            "/activities/types",
+            headers={"Authorization": "Bearer test"},
+        )
 
-        r = self.client.get("/activities",
-                            headers={"Authorization": "Bearer test"})
-        print(r.data)
+        self.assertEqual(response.status_code, 200)
+        self.verify_token_mock.assert_called_once_with("test")
 
 
 class Test_db(Base, TestCase):
