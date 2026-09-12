@@ -34,7 +34,12 @@ class Base(TestCase):
         print("setting up creating db")
         self.app = self.create_app()
         self._units = {}
+        verify_token_patcher = patch(
+            "q_flow.services.decorators.u_api.verify_token",
+            side_effect=self._verify_token,
+        )
         self._qauth_patchers = [
+            verify_token_patcher,
             patch("q_flow.routes.projects.create_project_unit", side_effect=self._create_unit),
             patch("q_flow.routes.projects.load_project_unit", side_effect=self._load_unit),
             patch("q_flow.routes.projects.ensure_unit_permission", side_effect=self._permission),
@@ -42,8 +47,22 @@ class Base(TestCase):
             patch("q_flow.routes.projects.u_api.get", side_effect=self._qauth_get),
             patch("q_flow.routes.projects.u_api.post", side_effect=self._qauth_post),
         ]
-        for patcher in self._qauth_patchers:
+        self.verify_token_mock = verify_token_patcher.start()
+        for patcher in self._qauth_patchers[1:]:
             patcher.start()
+
+    @staticmethod
+    def _verify_token(token):
+        return {
+            "email": "test@example.com",
+            "name": "Test User",
+            "role": "test",
+            "user_id": "1",
+            "client_app_id": "cashflowpot",
+            "is_active": True,
+            "app_user_active": True,
+            "token": token,
+        }
 
     @staticmethod
     def _unit(project, **overrides):
