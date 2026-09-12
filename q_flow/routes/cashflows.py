@@ -36,6 +36,15 @@ def _finite_number(value):
     )
 
 
+def _set_scalar_defaults(model):
+    for column in model.__table__.columns:
+        if getattr(model, column.key) is not None:
+            continue
+        default = column.default
+        if default is not None and default.is_scalar:
+            setattr(model, column.key, default.arg)
+
+
 def _validate_cashflow(cashflow):
     InvalidData.require_condition(
         _finite_number(cashflow.contract_value)
@@ -84,8 +93,9 @@ def new_cashflow(user, unit_id):
     cashflow.unit_id = unit_id
     db.session.add(cashflow)
     try:
-        db.session.flush()
+        _set_scalar_defaults(cashflow)
         _validate_cashflow(cashflow)
+        db.session.flush()
         snapshot = cashflow.as_dict_with_activities()
         db.session.commit()
     except Exception:
