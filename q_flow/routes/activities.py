@@ -94,6 +94,15 @@ def _apply_activity_updates(activity, data, user_id):
     activity.updated_at = func.now()
 
 
+def _set_scalar_defaults(model):
+    for column in model.__table__.columns:
+        if getattr(model, column.key) is not None:
+            continue
+        default = column.default
+        if default is not None and default.is_scalar:
+            setattr(model, column.key, default.arg)
+
+
 def _set_cached_cashflow(activity):
     calculator = Activity_cf(activity)
     activity.cash_flow_json = {
@@ -104,15 +113,14 @@ def _set_cached_cashflow(activity):
 
 def _finalize_mutation(cashflow, activity=None, use_type_skew=False):
     try:
-        # Populate SQLAlchemy column defaults before validating/calculating.
-        db.session.flush()
         if activity is not None:
+            _set_scalar_defaults(activity)
             if use_type_skew and activity.skew in (None, 0):
                 activity.skew = ActivityType.skew_by_code(activity.activity_type)
             _validate_activity(activity)
             _set_cached_cashflow(activity)
-            db.session.flush()
 
+        db.session.flush()
         snapshot = cashflow.as_dict_with_activities()
         db.session.commit()
         return snapshot
@@ -298,7 +306,6 @@ def restore_activities(user):
         for activity in restored_activities:
             activity.is_deleted = False
             activity.updated_by = user.get("user_id")
-        db.session.flush()
         for activity in restored_activities:
             _validate_activity(activity)
             _set_cached_cashflow(activity)
