@@ -127,8 +127,8 @@ def update_cashflow(user, cashflow_id):
     data = read_data(request)
     _apply_cashflow_updates(cashflow, data, user.get("user_id"))
     try:
-        db.session.flush()
         _validate_cashflow(cashflow)
+        db.session.flush()
         snapshot = cashflow.as_dict_with_activities()
         db.session.commit()
     except Exception:
