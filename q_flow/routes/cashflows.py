@@ -1,14 +1,17 @@
 """Independent cashflow scenario routes."""
 
+from math import isfinite
+
 from flask import Blueprint, jsonify, request
 
-from q_flow.exceptions import MissingData, ProjectNotDeleted, ProjectNotFound
+from q_flow.exceptions import InvalidData, MissingData, ProjectNotDeleted, ProjectNotFound
 from q_flow.extensions import db
 from q_flow.models.activity import Activity
 from q_flow.models.cashflow import Cashflow
 from q_flow.services.decorators import auth_required
 from q_flow.services.units import EDIT_CASHFLOW, VIEW_CASHFLOW, ensure_unit_permission
 from q_flow.services.utils import read_data
+from sqlalchemy import func
 
 cashflows = Blueprint("cashflows", __name__)
 
@@ -23,6 +26,50 @@ def _active_cashflow(cashflow_id: str) -> Cashflow:
     ProjectNotFound.require_condition(
         cashflow and not cashflow.is_deleted, "Cashflow not found")
     return cashflow
+
+
+def _finite_number(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(value)
+    )
+
+
+def _validate_cashflow(cashflow):
+    InvalidData.require_condition(
+        _finite_number(cashflow.contract_value)
+        and cashflow.contract_value >= 0,
+        "Contract value must be a finite non-negative number",
+    )
+    for field in ("advance", "retention", "release_retention_eop", "wieb"):
+        value = getattr(cashflow, field)
+        InvalidData.require_condition(
+            _finite_number(value) and 0 <= value <= 1,
+            f"Cashflow {field} must be between zero and one",
+        )
+    InvalidData.require_condition(
+        _finite_number(cashflow.interest_rate)
+        and cashflow.interest_rate >= 0,
+        "Interest rate must be a finite non-negative number",
+    )
+    for field in ("dlp", "duration_for_payment"):
+        value = getattr(cashflow, field)
+        InvalidData.require_condition(
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and value >= 0,
+            f"Cashflow {field} must be a non-negative integer",
+        )
+
+
+def _apply_cashflow_updates(cashflow, data, user_id):
+    protected = {"id", "unit_id", "created_at", "created_by"}
+    for key in cashflow.__table__.columns.keys():
+        if key in data and key not in protected:
+            setattr(cashflow, key, data[key])
+    cashflow.updated_by = user_id
+    cashflow.updated_at = func.now()
 
 
 @cashflows.route("/project/<unit_id>/cashflows", methods=["POST"])
@@ -60,10 +107,17 @@ def update_cashflow(user, cashflow_id):
     if error:
         return error
     data = read_data(request)
-    data.pop("unit_id", None)
-    cashflow.update(user.get("user_id"), **data)
+    _apply_cashflow_updates(cashflow, data, user.get("user_id"))
+    try:
+        db.session.flush()
+        _validate_cashflow(cashflow)
+        snapshot = cashflow.as_dict_with_activities()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return jsonify(
-        data=cashflow.as_dict_with_activities(),
+        data=snapshot,
         message="Cashflow updated successfully",
     ), 200
 
