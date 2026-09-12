@@ -15,7 +15,8 @@ class Test_activity_routes(Base, TestCase):
         r = self.client.post('/new_project',
             headers={'Authorization': 'Bearer test'},
             json={"name": "project 1"})
-        self.project = Project.query.filter(Project.id==r.json.get("data").get("id")).first()
+        cashflow_id = r.json["data"]["cashflows"][0]["id"]
+        self.project = Project.query.get(cashflow_id)
 
     def test_new_activity(self):
         '''Test the new activity route'''

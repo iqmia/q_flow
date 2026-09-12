@@ -3,6 +3,7 @@ from enum import Enum
 from typing_extensions import deprecated
 from q_flow.extensions import db
 from q_flow.models.mixins import BaseMixin
+from sqlalchemy.orm import synonym
 
 class ActivityType(Enum):
     GENERAL = ("General", 0)
@@ -42,11 +43,18 @@ class Activity(db.Model, BaseMixin):
     name = db.Column(db.String(64))
     cash_flow_json = db.Column(db.JSON)
 
-    project_id = db.Column(
+    cashflow_id = db.Column(
+        'project_id',
         db.String(64),
         db.ForeignKey('project.id'),
         nullable=False,
         )
+    project_id = synonym('cashflow_id')
+
+    def as_dict(self):
+        data = super().as_dict()
+        data['cashflow_id'] = data.pop('project_id')
+        return data
 
     # The type of activity. e.g. Structure, MEP, Facade, etc.
     activity_type = db.Column(db.String(64), default=ActivityType.GENERAL.code)
@@ -123,4 +131,3 @@ class Activity(db.Model, BaseMixin):
     # no billing period. This is the period of time after the start of the
     # activity during which no billing is issued.
     no_billing_period = db.Column(db.Integer, default=0)
-

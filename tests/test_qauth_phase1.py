@@ -153,7 +153,8 @@ def test_new_project_creates_qauth_unit_with_same_local_id(app):
     assert data["id"] == create.call_args.kwargs["project_id"]
     assert data["name"] == "Tower"
     assert data["description"] == "QAuth description"
-    assert data["contract_value"] == 1_000_000
+    assert data["cashflows"][0]["name"] == "Base Cashflow"
+    assert "contract_value" not in data
     assert data["photo"] == "https://qauth/unit/image/tower"
 
 
@@ -161,8 +162,8 @@ def test_projects_are_listed_from_qauth_units_and_merged_with_profiles(app):
     from q_flow.models.project import Project
 
     with app.app_context():
-        Project(id="p1", name="stale", description="stale", color="stale",
-                created_by="legacy", contract_value=250_000).commit()
+        Project(id="cf1", unit_id="p1", name="Tender", description="stale",
+                color="stale", created_by="legacy", contract_value=250_000).commit()
     qauth_response = U_Api_resp(200, "ok", _response(200, {
         "data": {
             "units_with_roles": [{
@@ -181,7 +182,9 @@ def test_projects_are_listed_from_qauth_units_and_merged_with_profiles(app):
     assert response.status_code == 200
     data = response.get_json()["data"][0]
     assert data["name"] == "Canonical"
-    assert data["contract_value"] == 250_000
+    assert data["cashflows"] == [{
+        "id": "cf1", "unit_id": "p1", "name": "Tender", "description": "stale",
+    }]
     assert data["roles"] == ["editor"]
 
 
@@ -189,7 +192,7 @@ def test_activity_mutation_requires_edit_cashflow_permission(app):
     from q_flow.models.project import Project
 
     with app.app_context():
-        Project(id="p1", name="Project", description="", created_by="u1").commit()
+        Project(id="cf1", unit_id="p1", name="Cashflow", description="", created_by="u1").commit()
     viewer = {
         "user_id": "u1", "name": "Viewer", "email": "viewer@example.com",
         "is_active": True, "unit_id": "p1", "unit_permissions": ["view:cashflow"],
@@ -197,7 +200,7 @@ def test_activity_mutation_requires_edit_cashflow_permission(app):
     }
     with patch("q_flow.services.decorators.u_api.verify_token", return_value=viewer):
         response = app.test_client().post(
-            "/new_activity/p1",
+            "/new_activity/cf1",
             headers={"Authorization": "Bearer viewer-token"},
             json={"name": "Concrete", "cost": 1000, "duration": 4},
         )
@@ -206,26 +209,13 @@ def test_activity_mutation_requires_edit_cashflow_permission(app):
     assert response.get_json()["code"] == "unit_access_denied"
 
 
-def test_legacy_project_migration_skips_existing_units(app):
-    from q_flow.models.project import Project
+def test_request_time_legacy_project_migration_is_removed(app):
+    response = app.test_client().post(
+        "/migrate_projects_to_units",
+        headers={"Authorization": "Bearer user-token"},
+    )
 
-    with app.app_context():
-        Project(id="existing", name="Existing", created_by="1").commit()
-        Project(id="legacy", name="Legacy", created_by="1").commit()
-    qauth_response = U_Api_resp(200, "ok", _response(200, {
-        "data": {"units_with_roles": [{"unit": {"id": "existing"}, "roles": ["creator"]}]}
-    }))
-    with patch("q_flow.routes.projects.u_api.get", return_value=qauth_response), \
-            patch("q_flow.routes.projects.create_project_unit", return_value={"id": "legacy"}) as create:
-        response = app.test_client().post(
-            "/migrate_projects_to_units",
-            headers={"Authorization": "Bearer user-token"},
-        )
-
-    assert response.status_code == 200
-    assert response.get_json()["data"]["migrated"] == ["legacy"]
-    assert create.call_count == 1
-    assert create.call_args.kwargs["project_id"] == "legacy"
+    assert response.status_code == 404
 
 
 def test_restore_uses_qauth_inactive_unit_endpoint_without_loading_unit(app):

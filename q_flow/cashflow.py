@@ -22,7 +22,7 @@ from matplotlib import pyplot as plt
 from asciichartpy import plot
 from prettytable import PrettyTable
 
-from q_flow.models.project import Project
+from q_flow.models.cashflow import Cashflow
 
 class Work():
     def __init__(self, d, s, c, ct="s") -> None:
@@ -108,8 +108,8 @@ class Work():
             t_work.append(mWork[t] + t_work[t-1])
         return t_work
 
-class Project_cf():
-    def __init__(self, project: Project) -> None:
+class CashflowCalculator():
+    def __init__(self, project: Cashflow) -> None:
         self.project = project
         self.work_cf = []
         self.outflow_cf = []
@@ -247,6 +247,10 @@ class Project_cf():
             table.add_row([activity.name, activity.start, activity.start + activity.duration, activity.duration])
         table.add_row(["Project", 1, self.duration, self.duration])
         click.echo(table)
+
+
+# Compatibility for older integrations while callers move to the clearer name.
+Project_cf = CashflowCalculator
 
 class Activity_cf():
     '''

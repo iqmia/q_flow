@@ -71,6 +71,39 @@ def create_project_unit(
     return payload.get("data", {}).get("unit") or {}
 
 
+def create_unit_for_owner(
+    api: User_API,
+    *,
+    owner_user_id: str,
+    unit_id: str,
+    name: str,
+    description: str = "",
+    color: str = "",
+) -> tuple[dict, bool]:
+    """Create a Unit through QAuth's trusted app-service endpoint."""
+    response = api.post(
+        "unit/admin/new",
+        data={
+            "owner_user_id": owner_user_id,
+            "id": unit_id,
+            "name": name,
+            "description": description or "",
+            "color": color or "",
+        },
+        files={
+            "roles_config": (
+                "cashflowpot_roles.json",
+                _roles_config_bytes(),
+                "application/json",
+            )
+        },
+    )
+    if response.error:
+        raise QAuthUnitError(response)
+    data = response_json(response).get("data") or {}
+    return data.get("unit") or {}, bool(data.get("already_exists"))
+
+
 def load_project_unit(user: dict, unit_id: str, api: User_API = u_api):
     response = api.get("unit/load", token=user.get("token"), unit_id=unit_id)
     if response.error:

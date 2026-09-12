@@ -33,6 +33,7 @@ class Base(TestCase):
     def setUp(self):
         print("setting up creating db")
         self.app = self.create_app()
+        self._units = {}
         self._qauth_patchers = [
             patch("q_flow.routes.projects.create_project_unit", side_effect=self._create_unit),
             patch("q_flow.routes.projects.load_project_unit", side_effect=self._load_unit),
@@ -59,27 +60,39 @@ class Base(TestCase):
     def _create_unit(self, _api, **kwargs):
         data = kwargs["data"]
         image = kwargs.get("image")
-        return {
+        unit = {
             "id": kwargs["project_id"],
             "name": data.get("name"),
             "description": data.get("description") or "",
             "color": data.get("color"),
             "image_url": f"https://qauth.test/unit/image/{image.filename}" if image else None,
         }
+        self._units[unit["id"]] = {**unit, "created_by": "1", "is_deleted": False}
+        return unit
+
+    def _find_unit(self, unit_id):
+        unit = self._units.get(unit_id)
+        if unit:
+            return unit
+        legacy = Project.query.get(unit_id)
+        if legacy:
+            return {**self._unit(legacy), "created_by": legacy.created_by,
+                    "is_deleted": legacy.is_deleted}
+        return None
 
     def _load_unit(self, user, unit_id):
-        project = Project.query.get(unit_id)
-        if not project:
+        unit = self._find_unit(unit_id)
+        if not unit:
             return None, (jsonify(message="Project not found"), 404)
-        if project.created_by != user.get("user_id"):
+        if unit["created_by"] != user.get("user_id"):
             return None, (jsonify(message="Permission denied"), 403)
         scoped = dict(user, unit_id=unit_id,
                       unit_permissions=["view:cashflow", "edit:cashflow"])
-        return (scoped, self._unit(project)), None
+        return (scoped, unit), None
 
     def _permission(self, user, unit_id, _permission):
-        project = Project.query.get(unit_id)
-        if project and project.created_by != user.get("user_id"):
+        unit = self._find_unit(unit_id)
+        if unit and unit["created_by"] != user.get("user_id"):
             return jsonify(message="Permission denied"), 403
         return dict(user, unit_id=unit_id,
                     unit_permissions=["view:cashflow", "edit:cashflow"])
@@ -88,14 +101,18 @@ class Base(TestCase):
         if route == "unit/units":
             page = int((data or {}).get("page", 1))
             per_page = int((data or {}).get("per_page", 10))
-            projects = Project.query.filter_by(created_by="1", is_deleted=False).all()
+            units = [unit for unit in self._units.values()
+                     if unit["created_by"] == "1" and not unit["is_deleted"]]
+            legacy = Project.query.filter_by(
+                created_by="1", unit_id=None, is_deleted=False).all()
+            units.extend({**self._unit(project), "created_by": project.created_by,
+                          "is_deleted": project.is_deleted} for project in legacy)
             start = (page - 1) * per_page
-            items = projects[start:start + per_page]
-            pages = (len(projects) + per_page - 1) // per_page
+            items = units[start:start + per_page]
+            pages = (len(units) + per_page - 1) // per_page
             payload = {"data": {
                 "units_with_roles": [
-                    {"unit": self._unit(project), "roles": ["creator"]}
-                    for project in items
+                    {"unit": unit, "roles": ["creator"]} for unit in items
                 ],
                 "pages": pages,
             }}
@@ -104,19 +121,35 @@ class Base(TestCase):
 
     def _qauth_post(self, route, data=None, files=None, unit_id=None, **_kwargs):
         if route in {"unit/activate", "unit/deactivate", "unit/delete"}:
-            project = Project.query.get(unit_id)
-            if project and project.created_by != "1":
+            unit = self._find_unit(unit_id)
+            if not unit:
+                return U_Api_resp(404, "Project not found", _FakeHTTPResponse(
+                    {"message": "Project not found"}, 404))
+            if unit["created_by"] != "1":
                 payload = {"code": "unit_access_denied", "message": "Permission denied"}
                 return U_Api_resp(403, "Permission denied", _FakeHTTPResponse(payload, 403))
+            if route == "unit/activate" and not unit["is_deleted"]:
+                return U_Api_resp(400, "Project is not deleted", _FakeHTTPResponse(
+                    {"message": "Project is not deleted"}, 400))
+            if route == "unit/activate":
+                unit["is_deleted"] = False
+            elif route == "unit/deactivate":
+                unit["is_deleted"] = True
+            elif route == "unit/delete":
+                self._units.pop(unit_id, None)
         if route == "unit/edit":
-            project = Project.query.get(unit_id)
-            unit = self._unit(
-                project,
-                name=(data or {}).get("name", project.name),
-                description=(data or {}).get("description", project.description),
-                color=(data or {}).get("color", project.color),
+            current = self._find_unit(unit_id)
+            if not current:
+                return U_Api_resp(404, "Project not found", _FakeHTTPResponse(
+                    {"message": "Project not found"}, 404))
+            unit = dict(
+                current,
+                name=(data or {}).get("name", current["name"]),
+                description=(data or {}).get("description", current["description"]),
+                color=(data or {}).get("color", current["color"]),
                 image_url=(f"https://qauth.test/unit/image/{files['image'][0]}" if files else None),
             )
+            self._units[unit_id] = unit
             return U_Api_resp(200, "ok", _FakeHTTPResponse({"data": {"unit": unit}}))
         return U_Api_resp(200, "ok", _FakeHTTPResponse({"message": "ok"}))
 

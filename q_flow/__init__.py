@@ -10,6 +10,7 @@ The file env.json is used to store the secret keys
 from json import dumps
 from flask import Config, Flask, jsonify, g
 from q_flow.command import create_cf
+from q_flow.commands.migrate_project_cashflows import migrate_projects_to_cashflows
 from q_flow.extensions import db, fs, lg, u_api, mail, er, cors
 
 def create_app(config_class=Config):
@@ -24,6 +25,7 @@ def create_app(config_class=Config):
     er.init_app(app)
     cors.init_app(app)
     app.cli.add_command(create_cf)
+    app.cli.add_command(migrate_projects_to_cashflows)
 
     # @app.after_request
     # def add_token_to_response(response):
@@ -35,12 +37,14 @@ def create_app(config_class=Config):
     #     return response
 
     from q_flow.routes.projects import projects
+    from q_flow.routes.cashflows import cashflows
     from q_flow.routes.activities import activities
     from q_flow.routes.users import users
     from logging import getLogger
     log = getLogger(__name__)
     log.debug('Routes registered')
     app.register_blueprint(projects)
+    app.register_blueprint(cashflows)
     app.register_blueprint(activities)
     app.register_blueprint(users)
 
