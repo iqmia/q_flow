@@ -113,93 +113,139 @@ class CashflowCalculator():
         self.project = project
         self.work_cf = []
         self.outflow_cf = []
+        self.activity_cashflows = {}
 
-        work_dur = []
-        work_total = []
-        out_dur = []
-        out_total = []
-        activity: Activity
-        activities = project.activities
-        for activity in activities:
-            if not activity.cash_flow_json:
-                activity_cf = Activity_cf(activity)
-                activity.cash_flow_json = {}
-                activity.cash_flow_json.update(activity_cf.marginal_work_as_json())
-                activity.cash_flow_json.update(activity_cf.out_flow_as_json())
-            activity_cf_json = activity.cash_flow_json
-            activity_work: list = activity_cf_json.get("marginal_work")
-            activity_outflow: list = activity_cf_json.get("marginal_out_flow")
-            # # adjust for start
-            # for _ in range(0, activity.start):
-            #     activity_work.insert(0, 0)
-            #     activity_outflow.insert(0, 0)
-            # project cashflow matrix
+        for activity in project.activities:
+            if activity.is_deleted:
+                continue
+            activity_cf = Activity_cf(activity)
+            activity_work = activity_cf.marginal_work_as_json()["marginal_work"]
+            activity_outflow = activity_cf.out_flow_as_json()["marginal_out_flow"]
             self.work_cf.append(activity_work)
             self.outflow_cf.append(activity_outflow)
-            work_dur.append(len(activity_work))
-            work_total.append(sum(activity_work))
-            out_dur.append(len(activity_outflow))
-            out_total.append(sum(activity_outflow))
+            self.activity_cashflows[activity.id] = {
+                "marginal_work": self._round_flow(activity_work),
+                "marginal_out_flow": self._round_flow(activity_outflow),
+            }
 
-        self.duration = max(work_dur)
-        self.cost = sum(work_total)
+        self.duration = max((len(work) for work in self.work_cf), default=0)
+        self.cost = sum(sum(work) for work in self.work_cf)
+
+    @staticmethod
+    def _round_flow(flow: list) -> list:
+        rounded = [round(float(value), 2) for value in flow]
+        return [0.0 if value == 0 else value for value in rounded]
+
+    def workflow(self) -> list:
+        return [sum(values) for values in zip_longest(
+            *self.work_cf, fillvalue=0)]
 
     def factored_work(self) -> list:
-        '''
-        this method calculates the inflow for the project. It sums the cashflow
-        of all activities and adjusts for the contract value.
-        '''
-        t_work = [sum(n) for n in zip_longest(*self.work_cf, fillvalue=0)]
+        """Scale the combined activity work to the contract value."""
+        t_work = self.workflow()
+        if not t_work:
+            return []
+        if self.cost == 0:
+            return [0.0 for _ in t_work]
         factor = self.project.contract_value / self.cost
-        t_work = [n * factor for n in t_work]
-        return t_work
+        return [value * factor for value in t_work]
 
     def inflow(self) -> list:
-        '''
-        This method calculates the inflow considering:
-        1. advance payment
-        2. retention
-        3. dlp
-        4. duration for payment
-        5. release retention at eop
-        6. release retention at dlp
-        7. activity work
-        '''
-        inflow = []
-        # add advance payment
-        inflow.append(self.project.advance * self.project.contract_value)
+        """Match the established Flutter payment and retention sequence."""
+        t_work = self.factored_work()
+        if not t_work:
+            return []
 
-        # add 0 for the duration for payment
+        inflow = []
+        if self.project.advance > 0:
+            inflow.append(self.project.advance * self.project.contract_value)
+
         for _ in range(0, self.project.duration_for_payment):
             inflow.append(0)
 
-        # add the factored work
+        # Flutter adds the first certified work to the last initial
+        # advance/payment-delay period rather than appending another period.
+        if not inflow:
+            inflow.append(0.0)
+        inflow[-1] += (
+            1 - self.project.advance - self.project.retention
+        ) * t_work[0]
+
         previous_work = 0
-        for work in self.factored_work():
-            bill_work = work *(1 - self.project.wieb) + previous_work * self.project.wieb
+        for work in t_work[1:]:
+            bill_work = (
+                work * (1 - self.project.wieb)
+                + previous_work * self.project.wieb
+            )
             previous_work = work
-            inflow.append((1-(self.project.advance + self.project.retention)) * bill_work)
+            inflow.append(
+                (1 - self.project.advance - self.project.retention) * bill_work
+            )
         inflow.append(
-            (1-(self.project.advance + self.project.retention)) * previous_work * self.project.wieb)
+            (1 - self.project.advance - self.project.retention)
+            * previous_work
+            * self.project.wieb
+        )
 
-        # add retention release at eop as per contract
-        inflow[-1] += self.project.retention * self.project.contract_value * self.project.release_retention_eop
+        inflow[-1] += (
+            self.project.retention
+            * self.project.contract_value
+            * self.project.release_retention_eop
+        )
 
-        # add zeros for the dlp
-        for _ in range(1, self.project.dlp):
+        for _ in range(0, max(self.project.dlp - 1, 0)):
             inflow.append(0)
 
-        # add retention release at dlp as per contract
-        inflow.append(self.project.retention * self.project.contract_value * (1 - self.project.release_retention_eop))
+        inflow.append(
+            self.project.retention
+            * self.project.contract_value
+            * (1 - self.project.release_retention_eop)
+        )
         return inflow
 
     def outflow(self) -> list:
-        '''
-        This method calculates the outflow for the project. It sums the cashflow
-        of all activities and adjusts for the contract value.
-        '''
-        outflow = [sum(n) for n in zip_longest(*self.outflow_cf, fillvalue=0)]
-        return outflow
+        """Sum current activity outflows by period."""
+        return [sum(values) for values in zip_longest(
+            *self.outflow_cf, fillvalue=0)]
+
+    def snapshot(self) -> dict:
+        if not self.work_cf:
+            return {
+                "workflow": [],
+                "inflow": [],
+                "outflow": [],
+                "netflow": [],
+                "outflow_with_interest": [],
+                "duration": 0,
+            }
+
+        workflow = self.workflow()
+        inflow = self.inflow()
+        outflow = self.outflow()
+        netflow = [
+            incoming - outgoing
+            for incoming, outgoing in zip_longest(
+                inflow, outflow, fillvalue=0
+            )
+        ]
+
+        balance = 0.0
+        outflow_with_interest = []
+        for amount in netflow:
+            if balance + amount < 0:
+                balance = (balance + amount) * (1 + self.project.interest_rate)
+            else:
+                balance += amount
+            outflow_with_interest.append(balance)
+
+        return {
+            "workflow": self._round_flow(workflow),
+            "inflow": self._round_flow(inflow),
+            "outflow": self._round_flow(outflow),
+            "netflow": self._round_flow(netflow),
+            "outflow_with_interest": self._round_flow(outflow_with_interest),
+            "duration": self.duration,
+        }
 
     def print_project_cashflow(self):
         cf = self
