@@ -93,6 +93,7 @@ def migrate_projects_to_cashflows(execute: bool) -> None:
     for cashflow in legacy_rows:
         original_name = cashflow.name or "Untitled Project"
         original_description = cashflow.description or ""
+        project_was_deleted = cashflow.is_deleted
         try:
             _, existed = create_unit_for_owner(
                 u_api,
@@ -102,7 +103,7 @@ def migrate_projects_to_cashflows(execute: bool) -> None:
                 description=original_description,
                 color=cashflow.color or "",
             )
-            if cashflow.is_deleted:
+            if project_was_deleted:
                 response = u_api.post(
                     "unit/admin/deactivate",
                     data={"unit_id": cashflow.id},
@@ -112,6 +113,9 @@ def migrate_projects_to_cashflows(execute: bool) -> None:
             cashflow.unit_id = cashflow.id
             cashflow.name = "Base Cashflow"
             cashflow.description = ""
+            # Deletion now belongs to the parent Unit. The financial scenario
+            # itself must remain active so restoring that Unit reveals it.
+            cashflow.is_deleted = False
             cashflow.updated_by = cashflow.created_by
             db.session.commit()
             migrated += 1
