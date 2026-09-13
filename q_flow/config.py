@@ -89,11 +89,13 @@ class TestConfig(Config):
 
     USER_API_URL = 'http://localhost:5000/user'
 
-    # Load secret keys from file
-    ENV_FILE = 'env_test.json'
-    data = get_env(ENV_FILE)
-    SECRET_KEY = data.get('SECRET_KEY', '')
-    MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')
-    APP_ID = data.get('APP_ID', '')
-    PUBLIC_KEY = data.get('PUBLIC_KEY', '')
-    ALGO = data.get('ALGO', '')
+    # Tests mock QAuth at the application boundary. Keep deterministic,
+    # non-secret values here so app initialization never depends on a local
+    # env_test.json file or a running QAuth service.
+    SECRET_KEY = 'test-secret-key'
+    MAIL_PASSWORD = ''
+    APP_ID = 'cashflowpot-test'
+    PUBLIC_KEY = 'test-public-key'
+    ALGO = 'RS256'
+    APP_SECRET = 'test-app-secret'
+    APP_ALGO = 'HS256'
