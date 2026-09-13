@@ -58,6 +58,10 @@ def _validate_cashflow(cashflow):
             f"Cashflow {field} must be between zero and one",
         )
     InvalidData.require_condition(
+        cashflow.advance + cashflow.retention <= 1,
+        "Cashflow advance and retention must not exceed one combined",
+    )
+    InvalidData.require_condition(
         _finite_number(cashflow.interest_rate)
         and cashflow.interest_rate >= 0,
         "Interest rate must be a finite non-negative number",
