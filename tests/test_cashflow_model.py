@@ -89,7 +89,7 @@ def _linear_activity(Cashflow, Activity, *, deleted=False, stored=None):
     return cashflow, activity
 
 
-def test_cashflow_snapshot_matches_flutter_compatibility_calculation(app):
+def test_cashflow_snapshot_uses_corrected_payment_timing(app):
     from q_flow.cashflow import CashflowCalculator
     from q_flow.models.activity import Activity
     from q_flow.models.cashflow import Cashflow
@@ -100,11 +100,11 @@ def test_cashflow_snapshot_matches_flutter_compatibility_calculation(app):
 
         assert snapshot == {
             "workflow": [50.0, 50.0],
-            "inflow": [12.0, 48.0, 38.4, 15.6, 0.0, 6.0],
+            "inflow": [12.0, 38.4, 48.0, 15.6, 0.0, 6.0],
             "outflow": [50.0, 50.0, 0.0, 0.0],
-            "netflow": [-38.0, -2.0, 38.4, 15.6, 0.0, 6.0],
+            "netflow": [-38.0, -11.6, 48.0, 15.6, 0.0, 6.0],
             "outflow_with_interest": [
-                -38.38, -40.78, -2.41, 13.19, 13.19, 19.19,
+                -38.38, -50.48, -2.5, 13.1, 13.1, 19.1,
             ],
             "duration": 2,
         }
@@ -184,7 +184,7 @@ def test_zero_advance_and_payment_delay_still_has_first_inflow_period(app):
         ).commit()
 
         snapshot = CashflowCalculator(cashflow).snapshot()
-        assert snapshot["inflow"] == [100.0, 0.0, 0.0]
+        assert snapshot["inflow"] == [100.0, 0.0]
         assert snapshot["netflow"] == [0.0, 0.0, 0.0]
 
 
