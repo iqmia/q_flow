@@ -127,8 +127,26 @@ def _filtered(data, allowed_fields):
     return {key: value for key, value in data.items() if key in allowed_fields}
 
 
+def _require_text(data, key, label):
+    value = data.get(key)
+    InvalidData.require_condition(
+        isinstance(value, str) and value.strip(),
+        f"{label} must be non-empty text",
+    )
+
+
+def _optional_text(data, key, label):
+    if key not in data:
+        return
+    InvalidData.require_condition(
+        isinstance(data[key], str),
+        f"{label} must be text",
+    )
+
+
 def _read_import_payload(data):
-    InvalidData.require_condition(isinstance(data, dict), "Invalid cashflow import payload")
+    InvalidData.require_condition(
+        isinstance(data, dict), "Invalid cashflow import payload")
     InvalidData.require_condition(
         data.get("format") == _IMPORT_FORMAT,
         "Unsupported cashflow file format",
@@ -185,7 +203,8 @@ def import_cashflow(user, unit_id):
 
     raw = read_data(request)
     cashflow_data, activity_rows = _read_import_payload(raw)
-    MissingData.require_condition(cashflow_data.get("name"), "Missing cashflow name")
+    _require_text(cashflow_data, "name", "Cashflow name")
+    _optional_text(cashflow_data, "description", "Cashflow description")
 
     user_id = user.get("user_id")
     cashflow = Cashflow().from_dict(
@@ -205,7 +224,9 @@ def import_cashflow(user, unit_id):
                 isinstance(row, dict),
                 "Each imported activity must be an object",
             )
-            MissingData.require_condition(row.get("name"), "Missing activity name")
+            _require_text(row, "name", "Activity name")
+            _optional_text(row, "activity_type", "Activity type")
+            _optional_text(row, "duration_units", "Activity duration units")
             MissingData.require_condition(
                 "cost" in row and "duration" in row,
                 "Missing activity cost or duration",
