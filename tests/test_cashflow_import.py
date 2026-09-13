@@ -53,7 +53,7 @@ def _payload():
                     "activity_type": "General",
                     "cost": 500000,
                     "duration": 4,
-                    "duration_units": "Months",
+                    "duration_units": "Periods",
                     "start": 0,
                     "advance": 0.1,
                     "retention": 0.1,
@@ -117,6 +117,24 @@ def test_import_cashflow_rejects_invalid_activity_without_partial_rows(app):
 def test_import_cashflow_rejects_unknown_format_version(app):
     payload = _payload()
     payload["version"] = 2
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().post(
+            "/project/unit-1/cashflows/import",
+            headers=_auth(),
+            json=payload,
+        )
+
+    assert result.status_code == 400
+    with app.app_context():
+        assert Cashflow.query.count() == 0
+        assert Activity.query.count() == 0
+
+
+def test_import_cashflow_rejects_non_text_name_without_partial_rows(app):
+    payload = _payload()
+    payload["cashflow"]["name"] = 123
     permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
     with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
