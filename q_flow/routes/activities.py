@@ -84,6 +84,10 @@ def _validate_activity(activity):
             _is_finite_number(value) and 0 <= value <= 1,
             f"Activity {field} must be between zero and one",
         )
+    InvalidData.require_condition(
+        activity.advance + activity.retention <= 1,
+        "Activity advance and retention must not exceed one combined",
+    )
 
 
 def _apply_activity_updates(activity, data, user_id):
