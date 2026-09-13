@@ -151,56 +151,60 @@ class CashflowCalculator():
         return [value * factor for value in t_work]
 
     def inflow(self) -> list:
-        """Match the established Flutter payment and retention sequence."""
+        """Calculate client receipts from work, payment terms, and retention."""
         t_work = self.factored_work()
         if not t_work:
             return []
 
-        inflow = []
-        if self.project.advance > 0:
-            inflow.append(self.project.advance * self.project.contract_value)
-
-        for _ in range(0, self.project.duration_for_payment):
-            inflow.append(0)
-
-        # Flutter adds the first certified work to the last initial
-        # advance/payment-delay period rather than appending another period.
-        if not inflow:
-            inflow.append(0.0)
-        inflow[-1] += (
+        payment_factor = (
             1 - self.project.advance - self.project.retention
-        ) * t_work[0]
+        )
 
-        previous_work = 0
+        # Period zero always exists so payment delay has the same meaning
+        # whether or not an advance payment is present. A delay of N moves
+        # progress receipts exactly N periods after the billed work.
+        inflow = [0.0 for _ in range(self.project.duration_for_payment + 1)]
+        inflow[0] += self.project.advance * self.project.contract_value
+
+        # WIEB is the share of each period's work billed in the next period.
+        # It therefore applies from the first work period, not only from the
+        # second period onward.
+        previous_work = t_work[0]
+        first_bill_work = t_work[0] * (1 - self.project.wieb)
+        inflow[self.project.duration_for_payment] += (
+            payment_factor * first_bill_work
+        )
+
         for work in t_work[1:]:
             bill_work = (
                 work * (1 - self.project.wieb)
                 + previous_work * self.project.wieb
             )
             previous_work = work
-            inflow.append(
-                (1 - self.project.advance - self.project.retention) * bill_work
-            )
+            inflow.append(payment_factor * bill_work)
+
+        # Carry the final WIEB balance into the following billing period.
         inflow.append(
-            (1 - self.project.advance - self.project.retention)
-            * previous_work
-            * self.project.wieb
+            payment_factor * previous_work * self.project.wieb
         )
 
+        value_of_retention = (
+            self.project.retention * self.project.contract_value
+        )
         inflow[-1] += (
-            self.project.retention
-            * self.project.contract_value
-            * self.project.release_retention_eop
+            value_of_retention * self.project.release_retention_eop
         )
 
-        for _ in range(0, max(self.project.dlp - 1, 0)):
-            inflow.append(0)
-
-        inflow.append(
-            self.project.retention
-            * self.project.contract_value
-            * (1 - self.project.release_retention_eop)
+        remaining_retention = (
+            value_of_retention * (1 - self.project.release_retention_eop)
         )
+        if self.project.dlp == 0:
+            inflow[-1] += remaining_retention
+        else:
+            for _ in range(1, self.project.dlp):
+                inflow.append(0.0)
+            inflow.append(remaining_retention)
+
         return inflow
 
     def outflow(self) -> list:
@@ -421,10 +425,18 @@ class Activity_cf():
             self.activity.retention
         sub_payments[-1] += value_of_retention * self.activity.release_retention_eop
 
-        # return the remaining 50% of retention at the end of dlp
-        for _ in range(1, self.activity.dlp):
-            sub_payments.append(0.0)
-        sub_payments[-1] += value_of_retention * (1-self.activity.release_retention_eop)
+        # Return the remaining retention exactly dlp periods after the
+        # end-of-project release. With dlp == 0, both portions are released in
+        # the same end period.
+        remaining_retention = (
+            value_of_retention * (1 - self.activity.release_retention_eop)
+        )
+        if self.activity.dlp == 0:
+            sub_payments[-1] += remaining_retention
+        else:
+            for _ in range(1, self.activity.dlp):
+                sub_payments.append(0.0)
+            sub_payments.append(remaining_retention)
         return sub_payments
 
     def non_sub_payments(self) -> list:
