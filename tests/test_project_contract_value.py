@@ -57,3 +57,15 @@ def test_project_contract_value_seeds_base_cashflow_without_reaching_qauth(app):
         base = Cashflow.query.one()
         assert base.name == "Base Cashflow"
         assert base.contract_value == 2_500_000
+
+
+def test_project_rejects_non_positive_contract_value_when_supplied(app):
+    response = app.test_client().post(
+        "/new_project",
+        headers={"Authorization": "Bearer user-token"},
+        json={"name": "Tower", "contract_value": 0},
+    )
+
+    assert response.status_code == 400
+    with app.app_context():
+        assert Cashflow.query.count() == 0
