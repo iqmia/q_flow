@@ -82,6 +82,56 @@ def test_project_zero_dlp_releases_all_retention_in_same_end_period(app):
         assert inflow == pytest.approx([90.0, 10.0])
 
 
+def test_snapshot_exposes_canonical_scenario_summary(app):
+    with app.app_context():
+        cashflow = Cashflow(
+            name="Summary test",
+            unit_id="unit-1",
+            created_by="user-1",
+            contract_value=50,
+            advance=0,
+            retention=0,
+            release_retention_eop=0.5,
+            dlp=0,
+            duration_for_payment=0,
+            interest_rate=0.1,
+            wieb=0,
+        ).commit()
+        Activity(
+            name="Split activity",
+            cashflow_id=cashflow.id,
+            created_by="user-1",
+            activity_type="linear",
+            cost=100,
+            duration=1,
+            start=0,
+            advance=0,
+            retention=0,
+            release_retention_eop=0.5,
+            dlp=0,
+            duration_for_payment=0,
+            work_in_excess=0,
+            mobilization_period=0,
+            no_billing_period=0,
+            subcontracted=0.5,
+        ).commit()
+
+        summary = CashflowCalculator(cashflow).snapshot()["summary"]
+
+        assert summary == {
+            "total_inflow": 50.0,
+            "subcontracted_cost": 50.0,
+            "self_performed_cost": 50.0,
+            "direct_cost": 100.0,
+            "financing_cost": 10.5,
+            "total_cost": 110.5,
+            "final_cash_balance": -60.5,
+            "work_duration": 1,
+            "dlp": 0,
+            "financial_horizon": 2,
+        }
+
+
 def _subcontract_activity(dlp):
     return SimpleNamespace(
         activity_type="linear",
