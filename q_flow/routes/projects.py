@@ -123,7 +123,8 @@ def new_project(user):
 
     unit = {**unit_data, "id": unit.get("id") or unit_id, **unit}
     cashflow = Cashflow(
-        unit_id=unit["id"], name="Base Cashflow", description="",
+        unit_id=unit["id"], name="Base Cashflow",
+        description=unit_data.get("description", ""),
         contract_value=contract_value,
         created_by=user.get("user_id"), updated_by=user.get("user_id"),
     )
