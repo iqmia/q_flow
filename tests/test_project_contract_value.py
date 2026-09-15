@@ -27,7 +27,7 @@ def app(tmp_path):
         db.drop_all()
 
 
-def test_project_contract_value_seeds_base_cashflow_without_reaching_qauth(app):
+def test_project_contract_value_and_description_seed_base_cashflow_without_reaching_qauth(app):
     def create_unit(_api, **kwargs):
         return {
             "id": kwargs["project_id"],
@@ -56,6 +56,7 @@ def test_project_contract_value_seeds_base_cashflow_without_reaching_qauth(app):
     with app.app_context():
         base = Cashflow.query.one()
         assert base.name == "Base Cashflow"
+        assert base.description == "Residential"
         assert base.contract_value == 2_500_000
 
 
