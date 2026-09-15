@@ -82,7 +82,7 @@ def test_project_zero_dlp_releases_all_retention_in_same_end_period(app):
         assert inflow == pytest.approx([90.0, 10.0])
 
 
-def test_snapshot_exposes_canonical_scenario_summary(app):
+def test_serialized_cashflow_exposes_canonical_scenario_summary(app):
     with app.app_context():
         cashflow = Cashflow(
             name="Summary test",
@@ -116,7 +116,7 @@ def test_snapshot_exposes_canonical_scenario_summary(app):
             subcontracted=0.5,
         ).commit()
 
-        summary = CashflowCalculator(cashflow).snapshot()["summary"]
+        summary = cashflow.as_dict_with_activities()["summary"]
 
         assert summary == {
             "total_inflow": 50.0,
