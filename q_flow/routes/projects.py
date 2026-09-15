@@ -1,10 +1,11 @@
 """Project routes backed by QAuth Units."""
 
 import logging
+from math import isfinite
 
 from flask import Blueprint, g, jsonify, request
 
-from q_flow.exceptions import MissingData
+from q_flow.exceptions import InvalidData, MissingData
 from q_flow.extensions import db, u_api
 from sqlalchemy import or_
 from q_flow.models.activity import Activity
@@ -89,22 +90,41 @@ def get_projects(user):
 def new_project(user):
     data = read_data(request)
     MissingData.require_condition(data.get("name"), "Missing name")
+
+    contract_value = data.get("contract_value", 0)
+    if "contract_value" in data:
+        InvalidData.require_condition(
+            isinstance(contract_value, (int, float))
+            and not isinstance(contract_value, bool)
+            and isfinite(contract_value)
+            and contract_value > 0,
+            "Contract value must be a finite positive number",
+        )
+
     unit_id = gen_id()
     color = data.get("color") or rnd_color()
+    unit_data = {
+        key: data[key]
+        for key in ("name", "description")
+        if key in data
+    }
+    unit_data["color"] = color
+
     try:
         unit = create_project_unit(
             u_api,
             token=user.get("token"),
             project_id=unit_id,
-            data={**data, "color": color},
+            data=unit_data,
             image=request.files.get("photo"),
         )
     except QAuthUnitError as error:
         return qauth_error(error.response)
 
-    unit = {**data, "id": unit.get("id") or unit_id, "color": color, **unit}
+    unit = {**unit_data, "id": unit.get("id") or unit_id, **unit}
     cashflow = Cashflow(
         unit_id=unit["id"], name="Base Cashflow", description="",
+        contract_value=contract_value,
         created_by=user.get("user_id"), updated_by=user.get("user_id"),
     )
     try:
