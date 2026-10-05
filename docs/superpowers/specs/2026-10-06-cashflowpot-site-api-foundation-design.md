@@ -41,11 +41,11 @@ Individual public pages will be added and reviewed one by one after the foundati
 
 Passenger mounts the existing Flask application at `cashflowpot.com/api`. Flask routes therefore remain rooted internally at `/`; for example an internal `/health` route is publicly available as `/api/health`.
 
-The backend gains a lightweight unauthenticated health endpoint returning a small JSON payload identifying the service as the CashflowPot API.
+The backend gains one lightweight unauthenticated `GET /health` endpoint returning HTTP 200 and a small JSON payload identifying the service as the CashflowPot API.
 
 Existing business routes are not renamed as part of this foundation work.
 
-The old duplicate internal `/api` welcome routes are obsolete under the new Passenger mount because they would become `/api/api`; they should be removed or replaced by the single `/health` route.
+The two existing internal `/api` welcome routes in `users.py` and `projects.py` are removed. They are obsolete under the new Passenger mount because they would otherwise appear publicly as `/api/api`.
 
 ## Public Site Design System
 
@@ -77,7 +77,8 @@ Semantic colors shared with the Flutter app:
 - Inflow / positive: `#79A58D`
 - Outflow / negative: `#C9796F`
 - Cost: `#7F9FB2`
-- Balance: muted warm brown/gold appropriate to theme
+- Balance, light: `#8D7047`
+- Balance, dark: `#CDB58A`
 
 ### UI language
 
@@ -118,11 +119,11 @@ The foundation should avoid page-specific marketing content. Each page is added 
 
 1. create/clean `site/dist/`;
 2. copy static assets into the output;
-3. render configured page templates when they are added;
+3. render only page templates explicitly configured in the build script as pages are added;
 4. preserve directory-style URLs by writing pages as `<slug>/index.html`;
 5. support root-level special files such as `404.html`, `robots.txt`, and `sitemap.xml` when those pages/files are introduced.
 
-The initial foundation may contain no public content page beyond the reusable shell; page generation is a later sequence.
+For the initial foundation, the configured page list is empty. Running the build therefore produces a clean `site/dist/` containing the shared static assets but no public content pages. This allows the site shell and build pipeline to be established before page content is reviewed.
 
 ## Error and Failure Boundaries
 
@@ -139,8 +140,8 @@ Foundation verification should cover:
 - existing backend test suite remains green;
 - `/health` returns HTTP 200 and the expected CashflowPot API identity;
 - the old duplicate `/api` welcome endpoints are no longer registered;
-- the site build script can generate a clean output directory and copy shared static assets;
-- generated base/template output uses the documented light/dark tokens and system-theme media query;
+- the site build script produces a clean output directory and copies shared static assets;
+- `site/static/css/site.css` contains the documented light/dark tokens and a `prefers-color-scheme: dark` rule;
 - `site/dist/` is ignored by Git.
 
 ## Out of Scope
