@@ -85,6 +85,9 @@ def test_import_cashflow_creates_complete_scenario_atomically(app):
     snapshot = result.get_json()["data"]
     assert snapshot["unit_id"] == "unit-1"
     assert snapshot["name"] == "Imported tender"
+    assert snapshot["use_independent_inflow_curve"] is True
+    assert snapshot["inflow_curve_type"] == "s_curve"
+    assert snapshot["inflow_curve_skew"] == 0.0
     assert len(snapshot["activities"]) == 1
     assert snapshot["activities"][0]["name"] == "Concrete"
     assert snapshot["activities"][0]["cashflow_id"] == snapshot["id"]
@@ -94,6 +97,29 @@ def test_import_cashflow_creates_complete_scenario_atomically(app):
     with app.app_context():
         assert Cashflow.query.filter_by(unit_id="unit-1").count() == 1
         assert Activity.query.count() == 1
+
+
+def test_import_cashflow_preserves_independent_inflow_settings(app):
+    payload = _payload()
+    payload["cashflow"].update({
+        "use_independent_inflow_curve": False,
+        "inflow_curve_type": "linear",
+        "inflow_curve_skew": 0.35,
+    })
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().post(
+            "/project/unit-1/cashflows/import",
+            headers=_auth(),
+            json=payload,
+        )
+
+    assert result.status_code == 201
+    snapshot = result.get_json()["data"]
+    assert snapshot["use_independent_inflow_curve"] is False
+    assert snapshot["inflow_curve_type"] == "linear"
+    assert snapshot["inflow_curve_skew"] == pytest.approx(0.35)
 
 
 def test_import_cashflow_rejects_invalid_activity_without_partial_rows(app):
