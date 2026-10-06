@@ -64,8 +64,27 @@
   text-decoration: none;
 }
 
+.site-footer__attribution {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 16px;
+}
+
 .site-footer__attribution p {
   margin: 0 0 10px;
+}
+
+.site-footer__quollnet {
+  display: block;
+  line-height: 0;
+}
+
+.site-footer__quollnet-logo {
+  width: 56px;
+  height: 56px;
+  display: block;
+  object-fit: contain;
 }
 
 .site-footer__meta {
@@ -92,14 +111,60 @@
 }
 
 .contact-card {
-  display: block;
-  padding: 24px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px;
   text-decoration: none;
 }
 
-.contact-card p:last-child {
-  margin-bottom: 0;
+.contact-card__icon {
+  width: 40px;
+  height: 40px;
+  display: block;
+  object-fit: contain;
+}
+
+.contact-card__icon--quollnet {
+  width: 48px;
+  height: 48px;
+}
+
+.contact-card__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contact-card__content strong {
+  color: var(--text);
+}
+
+.contact-card__content > span {
   color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.quollnet-company {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.quollnet-company__logo {
+  width: 72px;
+  height: 72px;
+  display: block;
+  object-fit: contain;
+}
+
+.quollnet-company h2,
+.quollnet-company p:last-child {
+  margin-bottom: 0;
 }
 
 .brand-hero {
@@ -162,12 +227,27 @@
     grid-template-columns: 1fr;
   }
 
-  .brand-hero {
+  .site-footer__attribution {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer__quollnet-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .brand-hero,
+  .quollnet-company {
     grid-template-columns: 1fr;
   }
 
   .brand-hero__logo {
     width: 88px;
     height: 88px;
+  }
+
+  .quollnet-company__logo {
+    width: 64px;
+    height: 64px;
   }
 }
