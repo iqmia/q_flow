@@ -56,7 +56,7 @@ class DocumentationTest(TestCase):
             "contract terms",
             "forecasting assumptions",
             "work in excess of billings (wieb)",
-            "activity-based outflow",
+            "outflow remains activity-based",
             "forecast, not a guarantee",
         ):
             self.assertIn(required, folded)
