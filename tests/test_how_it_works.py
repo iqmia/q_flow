@@ -27,9 +27,9 @@ class HowItWorksPageTest(TestCase):
 
         self.assertIn('<title>How CashflowPot Works | Construction Cash-Flow Forecasting</title>', html)
         self.assertIn('<link rel="canonical" href="https://cashflowpot.com/how-it-works/">', html)
-        self.assertIn('From project assumptions to a usable cash-flow forecast', html)
+        self.assertIn('From the project information you know to the cash decision you need.', html)
 
-    def test_page_explains_the_five_step_workflow(self):
+    def test_page_explains_the_six_step_workflow(self):
         module = _load_builder()
         with tempfile.TemporaryDirectory() as temp_dir:
             output = module.build_site(Path(temp_dir) / 'site-output')
@@ -37,22 +37,26 @@ class HowItWorksPageTest(TestCase):
 
         for heading in (
             'Define the project',
+            'Set the inflow forecast method',
             'Build the activity forecast',
-            'CashflowPot calculates the forecast',
-            'Review and adjust scenarios',
-            'Export and communicate',
+            'Apply contract terms and assumptions',
+            'Review the forecast',
+            'Revise scenarios and export',
         ):
             self.assertIn(heading, html)
 
         for concept in (
             'Contract value',
+            'Independent contract curve',
+            'Activity-linked inflow',
             'Retention',
             'Payment period',
             'WIEB',
-            'subcontracted portion',
+            'subcontracted share',
             'peak negative cash',
-            'Tender',
-            'Feasibility',
+            'working capital',
+            'lender review',
+            'mid-project reforecast',
         ):
             self.assertIn(concept, html)
 
@@ -63,8 +67,9 @@ class HowItWorksPageTest(TestCase):
             html = (output / 'how-it-works' / 'index.html').read_text(encoding='utf-8')
 
         self.assertIn('AI-assisted project setup is in development', html)
-        self.assertIn('the CashflowPot calculation engine remains responsible for the forecast', html)
-        self.assertIn('Primavera P6', html)
-        self.assertIn('MS Project', html)
+        self.assertIn('CashflowPot calculation engine remains responsible for the forecast', html)
+        self.assertIn('detailed programme can inform activity timing', html)
+        self.assertIn('does not require a detailed programme for every cash decision', html)
+        self.assertNotIn('CashflowPot does not replace Primavera P6', html)
         self.assertIn('href="/app/"', html)
         self.assertIn('href="/methodology/"', html)
