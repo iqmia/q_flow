@@ -128,8 +128,8 @@ def _validate_cashflow(cashflow):
         "Cashflow inflow_curve_type must be s_curve, linear, or null",
     )
 
-    if independent is True and curve_type is not None:
-        skew = getattr(cashflow, "inflow_curve_skew", None)
+    skew = getattr(cashflow, "inflow_curve_skew", None)
+    if skew is not None:
         InvalidData.require_condition(
             _finite_number(skew) and -1 < skew < 1,
             "Cashflow inflow_curve_skew must be finite and between -1 and 1",
