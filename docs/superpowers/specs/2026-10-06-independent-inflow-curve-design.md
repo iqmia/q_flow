@@ -89,7 +89,7 @@ A `NULL` value means the independent method is not active, even if the boolean i
 
 Controls front-loading/back-loading of the independent S-curve using the existing `Work` curve convention.
 
-For an active independent curve, validation is:
+Allowed values when non-null:
 
 ```text
 -1 < inflow_curve_skew < 1
@@ -97,10 +97,12 @@ For an active independent curve, validation is:
 
 New-scenario default: `0.0`.
 
+A `NULL` skew does **not** disable the independent method. It is interpreted as the balanced reference value `0.0`. Method selection depends only on the boolean flag and non-null curve type.
+
 Interpretation:
 
 - negative — back-loaded;
-- zero — balanced reference curve;
+- zero or NULL — balanced reference curve;
 - positive — front-loaded.
 
 For `linear`, the stored skew value does not affect the generated curve.
@@ -140,7 +142,7 @@ then:
 2. generate a `Work` curve using:
    - `d = execution_duration`
    - `c = contract_value`
-   - `s = inflow_curve_skew`
+   - `s = inflow_curve_skew`, with NULL treated as `0.0`
    - linear or S-curve according to `inflow_curve_type`;
 3. use the resulting marginal contract-value work series as the input to the existing client inflow transformation;
 4. apply the existing client advance, WIEB, retention, payment-delay and DLP rules without changing their semantics.
@@ -178,9 +180,10 @@ Backend validation is authoritative.
 
 Rules:
 
-- `use_independent_inflow_curve`, when supplied, must be a boolean;
+- `use_independent_inflow_curve`, when supplied, must be a boolean or NULL for compatibility with existing rows;
 - `inflow_curve_type`, when non-null, must be `s_curve` or `linear`;
-- when the independent method is active, `inflow_curve_skew` must be finite and strictly between `-1` and `1`;
+- `inflow_curve_skew`, when non-null, must be finite and strictly between `-1` and `1`;
+- a null skew is interpreted as `0.0` and does not affect method selection;
 - a null curve type always falls back to the activity-linked calculation.
 
 The new fields must be returned by normal cashflow/scenario API serialization and accepted by scenario create/update routes.
@@ -235,6 +238,7 @@ Backend tests should cover at least:
 - newly created Cashflow scenarios default to independent inflow with `s_curve` and zero skew;
 - a null `inflow_curve_type` always uses the activity-linked method;
 - `use_independent_inflow_curve = false` uses the activity-linked method even when curve settings exist;
+- independent mode remains active when the flag is true, curve type is non-null, and skew is null, with null skew treated as balanced `0.0`;
 - independent linear curve distributes contract value across the derived duration and sums to contract value;
 - independent S-curve uses skew and sums to contract value;
 - positive and negative skew produce different timing shapes from the balanced curve;
@@ -242,7 +246,7 @@ Backend tests should cover at least:
 - switching inflow method does not alter activity work/outflow calculations;
 - client WIEB, advance, retention, payment delay and DLP operate on whichever contract-work series is selected;
 - no-active-activity scenarios still return an empty forecast;
-- invalid flag/type/skew values are rejected;
+- invalid flag/type/non-null-skew values are rejected;
 - import/export preserves the new settings and older imports remain accepted;
 - full existing backend test suite remains green.
 
