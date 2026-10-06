@@ -9,3 +9,4 @@ env.json
 act.sh
 /logs/
 /migrate/
+/site/dist/
