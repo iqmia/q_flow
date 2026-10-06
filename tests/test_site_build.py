@@ -101,7 +101,8 @@ class SiteBuildTest(TestCase):
     def test_shared_shell_contains_logo_primary_nav_and_footer_links(self):
         template = BASE_TEMPLATE.read_text(encoding='utf-8')
         for token in (
-            '/app/icons/Icon-192.png', 'href="/"', 'href="/how-it-works/"',
+            '/app/icons/Icon-192.png', '/app/icons/quollnet_logo_transp.webp',
+            'href="/"', 'href="/how-it-works/"',
             'href="/methodology/"', 'href="/about/"', 'href="/app/"',
             'href="/contact/"', 'href="/privacy/"', 'href="/terms/"',
             'https://quollnet.com/apps/cashflowpot',
@@ -124,6 +125,7 @@ class SiteBuildTest(TestCase):
         page_css = (REPO_ROOT / 'site' / 'static' / 'css' / 'content-pages.css').read_text(encoding='utf-8')
         for token in (
             '.brand__logo', '.site-footer__groups', '.site-footer__group',
+            '.site-footer__quollnet-logo', '.contact-card__icon',
             '.legal-content', '@media (max-width: 760px)', '.site-nav__link',
             '.button--primary',
         ):
@@ -213,6 +215,22 @@ class SiteBuildTest(TestCase):
             ):
                 self.assertIn(token, html)
             self.assertNotIn('mailto:', html)
+        finally:
+            temp_dir.cleanup()
+
+    def test_contact_page_uses_existing_app_social_icons(self):
+        temp_dir, html = _build_page('contact/index.html')
+        try:
+            for icon_path in (
+                '/app/icons/quollnet_logo_transp.webp',
+                '/app/icons/facebook.png',
+                '/app/icons/insta.png',
+                '/app/icons/linkedin.png',
+                '/app/icons/twitter.png',
+                '/app/icons/wa.png',
+                '/app/icons/youtube.png',
+            ):
+                self.assertIn(icon_path, html)
         finally:
             temp_dir.cleanup()
 
