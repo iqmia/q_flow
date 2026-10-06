@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -12,6 +12,7 @@ SITE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = SITE_DIR / 'templates'
 STATIC_DIR = SITE_DIR / 'static'
 DEFAULT_OUTPUT_DIR = SITE_DIR / 'dist'
+DEFAULT_WEB_ROOT = Path.home() / 'www.cashflowpot.com'
 
 # Public pages are added here one by one after review.
 PAGES: tuple[tuple[str, str], ...] = (
@@ -54,19 +55,70 @@ def build_site(output_dir: Optional[Path] = None) -> Path:
     return output
 
 
-def main() -> int:
+def _managed_publish_entries() -> tuple[str, ...]:
+    entries = {'assets'}
+    entries.update(Path(destination).parts[0] for _, destination in PAGES)
+    return tuple(sorted(entries))
+
+
+def publish_site(build_dir: Path, web_root: Optional[Path] = None) -> Path:
+    source_root = Path(build_dir)
+    target_root = Path(web_root) if web_root is not None else DEFAULT_WEB_ROOT
+
+    if not target_root.is_dir():
+        raise FileNotFoundError(
+            f'CashflowPot web root does not exist: {target_root}. '
+            'Use -l/--local when building outside the production server.',
+        )
+
+    entries = _managed_publish_entries()
+    missing = [entry for entry in entries if not (source_root / entry).exists()]
+    if missing:
+        raise FileNotFoundError(
+            f'Built site is incomplete; missing: {", ".join(missing)}',
+        )
+
+    for entry in entries:
+        source = source_root / entry
+        target = target_root / entry
+
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+
+        if source.is_dir():
+            shutil.copytree(source, target)
+        else:
+            shutil.copy2(source, target)
+
+    return target_root
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description='Build the static CashflowPot public website.',
+        description='Build and publish the static CashflowPot public website.',
+    )
+    parser.add_argument(
+        '-l',
+        '--local',
+        action='store_true',
+        help='Build locally only; do not publish to the production web root.',
     )
     parser.add_argument(
         '--output',
         type=Path,
-        help='Output directory. Defaults to site/dist/.',
+        help='Build output directory. Defaults to site/dist/.',
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     output = build_site(args.output)
-    print(f'Built CashflowPot static site at {output}')
+    if args.local:
+        print(f'Built CashflowPot static site locally at {output}')
+        return 0
+
+    web_root = publish_site(output)
+    print(f'Built CashflowPot static site at {output} and published it to {web_root}')
     return 0
 
 
