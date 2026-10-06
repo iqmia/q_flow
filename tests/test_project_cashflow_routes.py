@@ -123,6 +123,95 @@ def test_cashflow_crud_is_scoped_to_parent_unit(app):
     assert all(call.args[1] == "unit-1" for call in permission.call_args_list)
 
 
+def test_new_cashflow_exposes_independent_inflow_defaults(app):
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().post(
+            "/project/unit-1/cashflows",
+            headers=_auth(),
+            json={"name": "Independent", "contract_value": 1_000_000},
+        )
+
+    assert result.status_code == 201
+    snapshot = result.get_json()["data"]
+    assert snapshot["use_independent_inflow_curve"] is True
+    assert snapshot["inflow_curve_type"] == "s_curve"
+    assert snapshot["inflow_curve_skew"] == 0.0
+
+
+def test_cashflow_rejects_invalid_independent_curve_type(app):
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().post(
+            "/project/unit-1/cashflows",
+            headers=_auth(),
+            json={
+                "name": "Invalid curve",
+                "contract_value": 1_000_000,
+                "use_independent_inflow_curve": True,
+                "inflow_curve_type": "custom",
+                "inflow_curve_skew": 0.0,
+            },
+        )
+
+    assert result.status_code == 400
+
+
+def test_cashflow_rejects_invalid_active_curve_skew_and_rolls_back(app):
+    with app.app_context():
+        Cashflow(
+            id="cf-skew",
+            unit_id="unit-1",
+            name="Original",
+            created_by="owner-1",
+            contract_value=1000,
+        ).commit()
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().put(
+            "/cashflow/cf-skew",
+            headers=_auth(),
+            json={"name": "Should not persist", "inflow_curve_skew": 1.0},
+        )
+
+    assert result.status_code == 400
+    with app.app_context():
+        cashflow = Cashflow.query.get("cf-skew")
+        assert cashflow.name == "Original"
+        assert cashflow.inflow_curve_skew == 0.0
+
+
+def test_legacy_null_curve_settings_remain_editable(app):
+    with app.app_context():
+        cashflow = Cashflow(
+            id="cf-legacy",
+            unit_id="unit-1",
+            name="Legacy",
+            created_by="owner-1",
+            contract_value=1000,
+        ).commit()
+        cashflow.use_independent_inflow_curve = None
+        cashflow.inflow_curve_type = None
+        cashflow.inflow_curve_skew = None
+        db.session.commit()
+
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().put(
+            "/cashflow/cf-legacy",
+            headers=_auth(),
+            json={"name": "Legacy updated"},
+        )
+
+    assert result.status_code == 200
+    snapshot = result.get_json()["data"]
+    assert snapshot["name"] == "Legacy updated"
+    assert snapshot["use_independent_inflow_curve"] is None
+    assert snapshot["inflow_curve_type"] is None
+    assert snapshot["inflow_curve_skew"] is None
+
+
 def test_activity_permission_uses_cashflow_unit(app):
     with app.app_context():
         cashflow = Cashflow(id="cf-1", unit_id="unit-1", name="Tender", created_by="owner-1").commit()
