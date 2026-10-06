@@ -4,41 +4,67 @@ Date: 2026-10-06
 
 ## Goal
 
-Bring the CashflowPot public website in line with the current product model, add the missing permanent pages, and establish a stable information architecture that can support product discovery, legal pages, support/contact, and future educational links without making the site feel like a content portal.
+Bring the CashflowPot public website in line with the current product model, add the missing permanent pages, and establish a stable information architecture for product discovery, methodology, support/contact, legal pages, and future educational links.
 
-The public site remains a lightweight static site generated from `q_flow/site/`. CashflowPot remains the dominant product brand; Quollnet remains the parent brand. The app continues to live at `/app/` and the Flask API at `/api/`.
+The public site remains a static site generated from `q_flow/site/`. CashflowPot remains the dominant product brand; Quollnet remains the parent brand. The app continues to live at `/app/` and the Flask API at `/api/`.
 
 ## Product Positioning To Preserve
 
-CashflowPot is a lightweight construction cash-flow forecasting application for contractors, commercial/project teams, finance teams, lenders and investors.
+CashflowPot is a focused construction cash-flow simulation and forecasting application for contractors, commercial/project teams, finance teams, lenders and investors.
 
-It is designed for tender forecasts, feasibility studies, working-capital planning, annual budgeting, project reforecasting, recovery planning and financing discussions.
+It is designed to answer financial and commercial questions quickly using a mathematical model of project execution, contract terms and forecasting assumptions. It does not require the user to first create or fully update a detailed resource-loaded programme merely to obtain a cash-flow view.
 
-It is not a replacement for Primavera P6, MS Project, ERP/accounting, or a full project cost-control system.
+This must not be positioned as a lesser or simplified version of Primavera P6, MS Project, ERP/accounting, or cost-control software. Those systems solve different problems.
 
-The key product philosophy is:
+Detailed planning systems primarily describe how work is planned and can provide planned work/cost values by period. CashflowPot focuses on the next commercial layer: how execution, contract terms and forecasting assumptions translate into cash received, cash paid, net cash and funding requirements.
+
+A useful public distinction is:
+
+> Planning software can show when work and cost are expected to occur. CashflowPot models how that execution, together with contract terms and assumptions, is expected to turn into cash.
+
+CashflowPot's value is strongest when the financial decision cannot or should not wait for a detailed planning update.
+
+Important use cases include:
+
+- **Tender / bid stage** — estimate the cash exposure of a prospective project without first creating a detailed resource-loaded tender programme.
+- **Bid / no-bid and portfolio capacity** — produce comparable forecasts for several opportunities to understand whether the contractor has sufficient financial capacity to pursue them together.
+- **Contractor financing** — prepare a credible project funding requirement and test the effect of contract terms before or during discussions with lenders.
+- **Bank / lender review** — reproduce or challenge a contractor's cash-flow assumptions and understand why the lender's forecast differs from the contractor's.
+- **Mid-project reforecasting** — create a current cash position when the programme has changed repeatedly and historical activity/resource loading no longer represents the remaining commercial reality well enough for a cash decision.
+- **Management what-if analysis** — test the financial effect of payment timing, retention, subcontracting, execution timing and other changes without rebuilding the full programme.
+- **Feasibility, budgeting and recovery planning** — obtain the forecast needed for a financial decision from the information currently available.
+
+The key product philosophy remains:
 
 > A forecast designed to be revised.
 
-The public site must explain that the model can be updated quickly as assumptions change rather than present CashflowPot as a one-time deterministic prediction engine.
+Supporting message:
+
+> Build the cash-flow view needed for the decision now, then revise it as the project changes.
+
+The public site must distinguish **contract terms** from **forecasting assumptions**. They are not interchangeable concepts.
+
+Examples of contract terms include payment period, retention, advance payment/recovery and Defects Liability Period (DLP). Examples of assumptions include WIEB percentage, execution curve/timing shape, subcontracted share where not already contractually fixed, and other forecast inputs used to simulate expected behavior.
+
+Public wording should therefore prefer phrases such as **contract terms and assumptions**, **commercial terms and assumptions**, or **execution assumptions and contract terms**, depending on context. Avoid describing all model inputs as assumptions.
 
 ## Current Product Model That Public Content Must Reflect
 
 The current public pages still describe the original activity-linked inflow calculation as though it were the only method. That is now outdated.
 
-CashflowPot supports two project inflow methods:
+CashflowPot supports two project inflow methods.
 
 ### Independent contract curve — default and recommended
 
 New scenarios default to an independent contract-value curve.
 
-- The project duration is still derived from the activity schedule.
+- Project duration is derived from the activity schedule.
 - Contract value is distributed over that duration using either an S-curve or a linear distribution.
 - The S-curve can be back-loaded, balanced or front-loaded.
 - New fast scenarios default to a balanced S-curve.
-- Client-side commercial assumptions are applied after the underlying contract-value distribution is generated.
+- Client-side contract terms and forecasting assumptions are applied after the underlying contract-value distribution is generated.
 
-The UI does not expose backend field names such as `use_independent_inflow_curve` or `inflow_curve_skew`.
+The UI and public site must not expose backend field names such as `use_independent_inflow_curve` or `inflow_curve_skew`.
 
 ### Activity-linked inflow — alternative
 
@@ -46,7 +72,7 @@ The existing method remains available.
 
 - Activity work/cost distributions are combined.
 - The combined profile is scaled proportionally to the contract value.
-- Main-contract commercial assumptions are then applied.
+- Main-contract terms and assumptions are then applied.
 
 This method should be described as an alternative for users who want contract inflow to follow the activity execution profile.
 
@@ -54,7 +80,7 @@ This method should be described as an alternative for users who want contract in
 
 Outflow remains activity-based under both inflow methods.
 
-Activities define execution cost, timing and project duration. Each activity can be linear or curved and can be split between direct/self-performed and subcontracted work. Subcontracted work follows its own commercial assumptions.
+Activities define execution cost, timing and project duration. Each activity can be linear or curved and can be split between direct/self-performed and subcontracted work. Subcontracted work follows its own contract/commercial terms and forecast assumptions.
 
 ### Terminology
 
@@ -65,6 +91,7 @@ Public site wording must match the current app:
 - `Defects Liability Period (DLP)`.
 - `Independent contract curve` and `Activity-linked inflow` for the two inflow methods.
 - Use `Back-loaded`, `Balanced`, and `Front-loaded` rather than exposing the numeric skew parameter to normal users.
+- Distinguish `contract terms` from `assumptions` rather than grouping all model inputs under one label.
 
 ## Information Architecture
 
@@ -129,12 +156,13 @@ The logo must work on both light and dark theme backgrounds. If the current icon
 
 ### Home (`/`)
 
-The current overall homepage direction remains valid, but outdated model wording must be corrected.
+The homepage should present CashflowPot as a purpose-built construction cash-flow decision tool, not as a smaller planning package.
 
-Primary message:
+Primary messages:
 
-- construction cash-flow forecasting without heavyweight setup;
-- usable for tendering, feasibility, budgeting, execution reforecasting and financing discussions;
+- simulate construction cash flow from execution assumptions, contract terms and commercial assumptions;
+- answer funding and cash-position questions quickly without waiting for a detailed programme creation or update;
+- useful for tendering, feasibility, bid/no-bid, portfolio capacity, budgeting, financing, lender review and execution reforecasting;
 - activities define execution timing/cost while contract inflow can be modeled independently or linked to execution.
 
 The homepage should not become a technical methodology page.
@@ -144,8 +172,13 @@ Required corrections:
 - remove wording that implies activities always drive contract value/earned value;
 - describe the independent contract curve as the normal/default method;
 - mention that a new scenario can be created quickly using sensible defaults, including a balanced S-curve;
+- make the distinction between planned work/cost and commercial cash flow clear without attacking or diminishing planning applications;
 - keep Excel export, funding requirement, peak negative cash, scenario comparison and lifecycle use cases prominent;
-- retain the statement that AI-assisted project setup is in development and that the backend calculation engine remains authoritative.
+- retain the statement that AI-assisted project setup is in development and that the CashflowPot calculation engine remains responsible for the forecast.
+
+A useful homepage message is:
+
+> Turn project execution, contract terms and assumptions into a cash-flow forecast — without waiting for a detailed programme update.
 
 ### How it works (`/how-it-works/`)
 
@@ -156,7 +189,8 @@ Recommended structure:
 1. **Define the project**
    - project name/description;
    - contract value;
-   - main commercial assumptions.
+   - known main-contract terms;
+   - forecasting assumptions where needed.
 
 2. **Set the inflow forecast method**
    - Independent contract curve — recommended/default;
@@ -169,13 +203,13 @@ Recommended structure:
    - direct/subcontracted split;
    - linear or S-curve work timing.
 
-4. **Apply commercial terms**
-   - client advance;
+4. **Apply contract terms and assumptions**
+   - client advance and recovery;
    - WIEB;
    - retention;
    - payment period;
    - DLP;
-   - subcontract-specific terms.
+   - subcontract-specific commercial terms and assumptions.
 
 5. **Review the forecast**
    - inflow;
@@ -190,6 +224,8 @@ Recommended structure:
 
 The page should stay practical and avoid detailed formulas.
 
+It should also explain that CashflowPot is useful even when a detailed programme exists: the programme can inform execution timing, while CashflowPot provides a focused commercial simulation layer for current cash decisions.
+
 ### Methodology (`/methodology/`)
 
 This page becomes the canonical public explanation of the model.
@@ -198,7 +234,13 @@ The opening philosophy remains:
 
 > A forecast designed to be revised.
 
-The existing methodology should be reorganized around the separation between execution and cash timing.
+The methodology should explain that the engine separates three concepts:
+
+1. **Execution model** — when cost/work is expected to occur.
+2. **Contract terms and forecasting assumptions** — how execution is converted into billings, receipts and payments.
+3. **Cash position** — inflow, outflow, net cash, cumulative balance and financing requirement.
+
+This is the central distinction between a time-phased cost/work view and a commercial cash-flow forecast.
 
 #### Main-contract inflow section
 
@@ -209,17 +251,17 @@ Explain the two supported methods explicitly.
 - determine scenario duration from the activity schedule;
 - distribute contract value across that duration using an S-curve or linear distribution;
 - allow timing to be back-loaded, balanced or front-loaded for the S-curve;
-- apply client-side commercial assumptions after the contract-value distribution.
+- apply client-side contract terms and assumptions after the contract-value distribution.
 
 **Activity-linked inflow — alternative**
 
 - combine activity work distributions;
 - scale the combined profile to contract value;
-- apply the same client commercial assumptions afterward.
+- apply the same client contract terms and assumptions afterward.
 
 The public page should explain the concept first; advanced formulas/details can remain under expandable sections where appropriate.
 
-#### Client commercial terms
+#### Client contract terms and assumptions
 
 Keep and update explanations for:
 
@@ -230,6 +272,8 @@ Keep and update explanations for:
 - release at completion;
 - DLP release.
 
+Where relevant, identify whether an input normally represents a contract term or a forecasting assumption rather than presenting the entire group as assumptions.
+
 #### Execution/outflow section
 
 Keep activity-based logic:
@@ -237,13 +281,24 @@ Keep activity-based logic:
 - activity work distribution;
 - direct/self-performed share;
 - subcontracted share;
-- subcontract commercial assumptions;
+- subcontract contract/commercial terms and assumptions;
 - direct cost has no WIEB transformation;
-- subcontract WIEB represents performed work not yet billable to the contractor by the subcontractor relationship.
+- subcontract WIEB represents performed work not yet billable within the subcontract relationship.
 
 #### Net cash and financing
 
 Retain the clear distinction between inflow, outflow, net cash, cumulative/pre-finance balance and financing charge on negative balances.
+
+#### Position relative to scheduling systems
+
+Do not use a generic `CashflowPot is not a replacement for P6` disclaimer.
+
+Instead explain the difference in purpose:
+
+- scheduling/planning systems can provide a detailed programme and time-phased work/cost information;
+- CashflowPot is designed to simulate the commercial cash consequences from execution timing, contract terms and assumptions;
+- the tools can complement one another, but CashflowPot does not require a detailed resource-loaded programme when the decision does not justify that effort;
+- during tendering or mid-project reforecasting, a mathematical execution profile can provide the right level of input for a financial decision faster than rebuilding detailed loading.
 
 #### Remove obsolete roadmap claim
 
@@ -256,11 +311,12 @@ Purpose: explain what CashflowPot is and why it exists without duplicating the h
 Content:
 
 - larger CashflowPot logo/brand treatment;
-- short description of CashflowPot as focused construction cash-flow forecasting software;
-- why it exists: cash decisions often need a credible forecast faster than rebuilding a detailed cost-loaded programme;
-- target users and decisions;
+- description of CashflowPot as a focused construction cash-flow simulation and forecasting product;
+- why it exists: financial decisions often need a credible current forecast faster than creating or rebuilding a detailed cost/resource-loaded programme;
+- target users and decision contexts;
+- examples such as tendering, financing, lender review, bid/no-bid, portfolio capacity and mid-project reforecasting;
 - `A forecast designed to be revised` philosophy;
-- lightweight-by-design boundaries;
+- explain that detailed planning and CashflowPot solve different questions rather than describing CashflowPot as a lighter substitute;
 - CashflowPot is a Quollnet product;
 - link to `https://quollnet.com/apps/cashflowpot`.
 
@@ -340,9 +396,9 @@ Sections should cover:
 - acceptance of terms;
 - account responsibility;
 - permitted/acceptable use;
-- user responsibility for project assumptions and entered data;
-- forecasts are planning estimates, not guarantees of actual future cash flows;
-- users remain responsible for professional/commercial decisions;
+- user responsibility for project data, contract terms and forecasting assumptions entered into the model;
+- forecasts are planning estimates/simulations, not guarantees of actual future cash flows;
+- users remain responsible for professional, commercial and financing decisions;
 - service availability and the ability to change/improve the service;
 - ownership of the CashflowPot service and user ownership/responsibility for their own project content;
 - reasonable limitation-of-liability/disclaimer language without overreaching wording;
@@ -451,7 +507,9 @@ Extend `tests/test_site_build.py` first so the test suite verifies:
 - Privacy and Terms contain `Quollnet` and `Quoll Unipessoal LDA`;
 - Contact contains the approved Quollnet contact destinations;
 - Home/How it works/Methodology contain the updated independent-vs-linked inflow terminology;
-- obsolete public wording such as `Billing Deferral` and the planned activity-specific selling-value roadmap section does not remain in current generated pages.
+- public content distinguishes contract terms from forecasting assumptions;
+- public positioning describes CashflowPot as a different-purpose commercial cash-flow tool rather than a lesser planning product;
+- obsolete wording such as `Billing Deferral` and the planned activity-specific selling-value roadmap section does not remain in current generated pages.
 
 Run focused site-build tests first, then the full backend suite before completion.
 
@@ -464,22 +522,23 @@ This pass does not:
 - add a blog/resources section to CashflowPot;
 - add pricing pages;
 - add a contact form or support ticket system;
-- change authentication or Flutter app behavior;
-- change calculation logic;
-- add per-activity selling values/SOV modeling;
 - add a manual public-site theme switcher;
-- replace the existing static-site build architecture.
+- change the CashflowPot calculation engine;
+- change authenticated Flutter UI behavior;
+- attempt to replicate detailed planning/scheduling functionality.
 
 ## Acceptance Criteria
 
-The pass is complete when:
+The work is complete when:
 
-1. Home, How it works and Methodology accurately describe the current two-mode inflow model, with independent balanced S-curve as the new-scenario default.
-2. About, Contact, Privacy and Terms are generated as permanent static pages with consistent CashflowPot branding.
-3. Privacy and Terms visibly use `Quollnet` with `Quoll Unipessoal LDA` as the legal operator.
-4. Contact uses the existing Quollnet channels and does not invent a CashflowPot-specific contact identity.
-5. The header remains product-focused; legal/support links live in the footer.
-6. The existing Quollnet ecosystem attribution and stable Quollnet CashflowPot app link remain present.
-7. The CashflowPot logo is reused from the existing product assets and served locally by the static site.
-8. No legacy Quollnet article URL is linked from the CashflowPot site until the article/slug rewrite is complete.
-9. Static-site tests and the full backend test suite are green before merge.
+1. Home, How it works and Methodology accurately describe the current two-mode inflow model and the execution/outflow model.
+2. The site positions CashflowPot as a purpose-built construction cash-flow simulation/decision tool rather than a lesser alternative to planning software.
+3. Public copy consistently distinguishes contract terms from forecasting assumptions.
+4. About, Contact, Privacy and Terms are generated and reachable at stable trailing-slash URLs.
+5. Privacy and Terms visibly identify `Quollnet` with `Quoll Unipessoal LDA` as the legal operator.
+6. The header uses the CashflowPot logo and keeps primary navigation concise.
+7. The footer provides Product and Company/support navigation and preserves the existing Quollnet ecosystem attribution.
+8. Contact uses the existing Quollnet contact channels and does not invent CashflowPot-specific contact details.
+9. The four outdated Quollnet articles are not linked from the CashflowPot site in this pass.
+10. The old activity-specific selling-value roadmap claim is removed from Methodology.
+11. Focused site tests and the full backend test suite pass before the branch is considered ready for merge.
