@@ -16,6 +16,7 @@ DEFAULT_OUTPUT_DIR = SITE_DIR / 'dist'
 # Public pages are added here one by one after review.
 PAGES: tuple[tuple[str, str], ...] = (
     ('index.html', 'index.html'),
+    ('how-it-works.html', 'how-it-works/index.html'),
     ('404.html', '404.html'),
 )
 
