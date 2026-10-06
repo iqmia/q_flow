@@ -1,0 +1,258 @@
+:root {
+  color-scheme: light;
+  --brand: #E89A5B;
+  --canvas: #F7F4EF;
+  --surface: #FFFDFC;
+  --field: #FFFDFC;
+  --text: #30322F;
+  --text-muted: #6F6A63;
+  --border: #E5DED4;
+  --inflow: #79A58D;
+  --outflow: #C9796F;
+  --cost: #7F9FB2;
+  --balance: #8D7047;
+  --focus: #E89A5B;
+  --radius-control: 12px;
+  --radius-card: 14px;
+  --shadow-subtle: 0 8px 24px rgb(48 50 47 / 0.06);
+  --content-width: 1120px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: #181A18;
+    --surface: #20221F;
+    --field: #272A26;
+    --text: #F4F1EB;
+    --text-muted: #B9B4AC;
+    --border: #454943;
+    --balance: #CDB58A;
+    --shadow-subtle: 0 8px 24px rgb(0 0 0 / 0.16);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--canvas);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3 {
+  margin-top: 0;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 5vw, 4.5rem);
+  font-weight: 750;
+}
+
+h2 {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+}
+
+p {
+  margin-top: 0;
+}
+
+.site-shell {
+  width: min(calc(100% - 32px), var(--content-width));
+  margin-inline: auto;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--canvas) 92%, transparent);
+}
+
+.site-header__inner {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.brand {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand__name {
+  font-size: 1.15rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.brand__parent {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.button {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.button--primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #30322F;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-subtle);
+}
+
+.field {
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--text);
+}
+
+#main-content {
+  min-height: calc(100vh - 170px);
+}
+
+.site-footer {
+  margin-top: 72px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.site-footer__inner {
+  min-height: 98px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 24px;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+.site-footer__meta {
+  font-size: 0.86rem;
+}
+
+.metric--inflow,
+.text--positive {
+  color: var(--inflow);
+}
+
+.metric--outflow,
+.text--negative {
+  color: var(--outflow);
+}
+
+.metric--cost {
+  color: var(--cost);
+}
+
+.metric--balance {
+  color: var(--balance);
+}
+
+@media (max-width: 640px) {
+  .site-shell {
+    width: min(calc(100% - 24px), var(--content-width));
+  }
+
+  .site-header__inner {
+    min-height: 64px;
+    gap: 12px;
+  }
+
+  .brand__parent {
+    font-size: 0.68rem;
+  }
+
+  .button {
+    min-height: 46px;
+    padding-inline: 14px;
+  }
+
+  .site-footer__inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
