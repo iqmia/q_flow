@@ -188,7 +188,7 @@ def test_independent_s_curve_skew_changes_timing_but_not_total_value(app):
 
 def test_switching_inflow_method_does_not_change_outflow(app):
     with app.app_context():
-        cashflow = _profile_cashflow(app, duration=4, subcontracted=0)
+        cashflow = _profile_cashflow(app, duration=4)
         independent_outflow = CashflowCalculator(cashflow).outflow()
 
         cashflow.use_independent_inflow_curve = False
