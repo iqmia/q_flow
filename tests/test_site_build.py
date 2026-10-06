@@ -70,6 +70,25 @@ class SiteBuildTest(TestCase):
         self.assertIn('Quollnet ecosystem', template)
         self.assertIn('/app/', template)
 
+    def test_build_generates_branded_noindex_404_page(self):
+        module = _load_builder()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = module.build_site(Path(temp_dir) / 'site-output')
+            page = output / '404.html'
+            self.assertTrue(page.is_file())
+            html = page.read_text(encoding='utf-8')
+
+        self.assertIn('<meta name="robots" content="noindex">', html)
+        self.assertIn('<title>Page not found | CashflowPot</title>', html)
+        self.assertIn('Page not found', html)
+        self.assertIn('The page you’re looking for doesn’t exist or may have moved.', html)
+        self.assertIn('href="/"', html)
+        self.assertIn('Back to CashflowPot', html)
+        self.assertIn('href="/app/"', html)
+        self.assertIn('Open app', html)
+        self.assertIn('A Quollnet product', html)
+        self.assertIn('Quollnet ecosystem', html)
+
     def test_generated_site_output_is_ignored(self):
         gitignore = GITIGNORE.read_text(encoding='utf-8').splitlines()
         self.assertIn('/site/dist/', gitignore)
