@@ -129,8 +129,10 @@ def test_null_curve_type_falls_back_to_activity_linked_contract_work(app):
             duration=2,
             start=2,
             use_independent_inflow_curve=True,
-            inflow_curve_type=None,
         )
+        # Existing rows gain nullable schema columns without a data backfill.
+        # Model that real post-upgrade state after the row has been inserted.
+        cashflow.inflow_curve_type = None
         calculator = CashflowCalculator(cashflow)
 
         assert calculator.contract_work() == pytest.approx(calculator.factored_work())
