@@ -50,6 +50,46 @@ def _one_period_cashflow(app, **overrides):
     return cashflow
 
 
+def _profile_cashflow(app, *, duration=4, start=0, **overrides):
+    values = {
+        "name": "Curve profile",
+        "unit_id": "unit-1",
+        "created_by": "user-1",
+        "contract_value": 400,
+        "advance": 0,
+        "retention": 0,
+        "release_retention_eop": 0.5,
+        "dlp": 0,
+        "duration_for_payment": 0,
+        "interest_rate": 0,
+        "wieb": 0,
+        "use_independent_inflow_curve": True,
+        "inflow_curve_type": "s_curve",
+        "inflow_curve_skew": 0.0,
+    }
+    values.update(overrides)
+    cashflow = Cashflow(**values).commit()
+    Activity(
+        name="Execution profile",
+        cashflow_id=cashflow.id,
+        created_by="user-1",
+        activity_type="linear",
+        cost=200,
+        duration=duration,
+        start=start,
+        advance=0,
+        retention=0,
+        release_retention_eop=0.5,
+        dlp=0,
+        duration_for_payment=0,
+        work_in_excess=0,
+        mobilization_period=0,
+        no_billing_period=0,
+        subcontracted=0,
+    ).commit()
+    return cashflow
+
+
 def test_project_wieb_defers_first_period_work(app):
     with app.app_context():
         cashflow = _one_period_cashflow(app, wieb=0.2)
@@ -80,6 +120,97 @@ def test_project_zero_dlp_releases_all_retention_in_same_end_period(app):
         inflow = CashflowCalculator(cashflow).inflow()
 
         assert inflow == pytest.approx([90.0, 10.0])
+
+
+def test_null_curve_type_falls_back_to_activity_linked_contract_work(app):
+    with app.app_context():
+        cashflow = _profile_cashflow(
+            app,
+            duration=2,
+            start=2,
+            use_independent_inflow_curve=True,
+            inflow_curve_type=None,
+        )
+        calculator = CashflowCalculator(cashflow)
+
+        assert calculator.contract_work() == pytest.approx(calculator.factored_work())
+        assert calculator.contract_work() == pytest.approx([0.0, 0.0, 200.0, 200.0])
+
+
+def test_false_independent_flag_falls_back_to_activity_linked_contract_work(app):
+    with app.app_context():
+        cashflow = _profile_cashflow(
+            app,
+            duration=2,
+            start=2,
+            use_independent_inflow_curve=False,
+            inflow_curve_type="linear",
+        )
+        calculator = CashflowCalculator(cashflow)
+
+        assert calculator.contract_work() == pytest.approx(calculator.factored_work())
+        assert calculator.contract_work() == pytest.approx([0.0, 0.0, 200.0, 200.0])
+
+
+def test_independent_linear_curve_uses_derived_execution_duration(app):
+    with app.app_context():
+        cashflow = _profile_cashflow(
+            app,
+            duration=2,
+            start=2,
+            inflow_curve_type="linear",
+            contract_value=400,
+        )
+        calculator = CashflowCalculator(cashflow)
+
+        contract_work = calculator.contract_work()
+
+        assert calculator.duration == 4
+        assert contract_work == pytest.approx([100.0, 100.0, 100.0, 100.0])
+        assert sum(contract_work) == pytest.approx(400.0)
+
+
+def test_independent_s_curve_skew_changes_timing_but_not_total_value(app):
+    with app.app_context():
+        back = _profile_cashflow(app, duration=6, inflow_curve_skew=-0.5)
+        balanced = _profile_cashflow(app, duration=6, inflow_curve_skew=0.0)
+        front = _profile_cashflow(app, duration=6, inflow_curve_skew=0.5)
+
+        back_work = CashflowCalculator(back).contract_work()
+        balanced_work = CashflowCalculator(balanced).contract_work()
+        front_work = CashflowCalculator(front).contract_work()
+
+        assert front_work[0] > balanced_work[0] > back_work[0]
+        assert sum(back_work) == pytest.approx(back.contract_value)
+        assert sum(balanced_work) == pytest.approx(balanced.contract_value)
+        assert sum(front_work) == pytest.approx(front.contract_value)
+
+
+def test_switching_inflow_method_does_not_change_outflow(app):
+    with app.app_context():
+        cashflow = _profile_cashflow(app, duration=4, subcontracted=0)
+        independent_outflow = CashflowCalculator(cashflow).outflow()
+
+        cashflow.use_independent_inflow_curve = False
+        linked_outflow = CashflowCalculator(cashflow).outflow()
+
+        assert linked_outflow == pytest.approx(independent_outflow)
+
+
+def test_independent_curve_still_applies_client_wieb(app):
+    with app.app_context():
+        cashflow = _profile_cashflow(
+            app,
+            duration=2,
+            inflow_curve_type="linear",
+            contract_value=200,
+            wieb=0.2,
+        )
+
+        inflow = CashflowCalculator(cashflow).inflow()
+
+        assert inflow == pytest.approx([80.0, 100.0, 20.0])
+        assert sum(inflow) == pytest.approx(200.0)
 
 
 def test_serialized_cashflow_exposes_canonical_scenario_summary(app):
