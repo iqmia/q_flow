@@ -18,13 +18,6 @@ def _token_user(token):
     user['image'] = user.get('image') or user.get('photo') or ''
     return user
 
-@users.route('/api', methods=['GET'])
-def api():
-    return jsonify(
-        dict(
-            message='Welcome to the Q-Flow API',
-        )), 200
-
 @users.route('/user', methods=['GET'])
 def get_user_by_token():
     data = read_data(request)
