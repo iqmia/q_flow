@@ -1,56 +1,73 @@
 # q_flow
 
-`q_flow` is the authoritative backend and calculation engine for CashflowPot, and it also contains the source/build foundation for the public CashflowPot website.
+`q_flow` is the authoritative Flask backend and cash-flow calculation engine for CashflowPot. It also contains the source/build system for the public CashflowPot website.
 
-CashflowPot is a lightweight construction project cash-flow forecasting application. It estimates project cash inflow, outflow, net cash flow, and funding position from project and activity assumptions without attempting to reproduce a fully resource- or quantity-loaded programme.
+CashflowPot turns construction project execution, contract terms, and forecasting assumptions into cash inflow, cash outflow, net cash, cumulative cash position, and funding/working-capital forecasts.
 
-## Public deployment
+## Start here
 
-CashflowPot is split into three public surfaces:
+The current product definition and technical documentation live under:
+
+[`documentation/README.md`](documentation/README.md)
+
+That index explains what CashflowPot is today, how the backend/client/deployment fit together, the UI terminology rules, detailed calculation/security/file-format references, and approved future directions.
+
+`docs/superpowers/specs/` and `docs/superpowers/plans/` are development/design history, not the current product definition.
+
+## Repository role
+
+This repository owns:
+
+- the Flask API;
+- the authoritative calculation engine;
+- local Cashflow/Activity persistence;
+- QAuth project/unit integration;
+- portable scenario import handling;
+- backend tests; and
+- the static public-site source and publisher under `site/`.
+
+The Flutter application is maintained separately in `iqmia/cashflowpot`.
+
+## Public surfaces
 
 ```text
 cashflowpot.com/      static public website generated from site/
-cashflowpot.com/app/  Flutter application from iqmia/cashflowpot
-cashflowpot.com/api/  this Flask application mounted by Passenger
+cashflowpot.com/app/  Flutter application
+cashflowpot.com/api/  q_flow Flask API mounted by Passenger
 ```
 
-Passenger mounts the Flask app at `/api`, while Flask routes remain rooted internally at `/`. For example, the internal health route `/health` is deployed as:
+Passenger provides the public `/api` base URI; Flask routes remain internally unprefixed.
 
-```text
-GET https://cashflowpot.com/api/health
-```
+## Public-site commands
 
-The internal repository and Python package remain named `q_flow`.
-
-## Public website source
-
-The public website is authored under `site/` with shared Jinja templates and CSS, then generated as static files for deployment. Flask does not render ordinary public pages at request time.
-
-Build the static site with:
+Production/server build + publish:
 
 ```bash
 python site/build_site.py
 ```
 
-The default output is `site/dist/`. Generated output is ignored by Git and should not be committed.
+Local build only:
 
-Individual public pages are added to the static builder only after their content and layout are reviewed.
+```bash
+python site/build_site.py -l
+```
 
-## Project model
+Generated static output is written to `site/dist/` and is not committed.
 
-A project is identified by a QAuth Unit. Each QAuth Unit can own multiple independent local cash-flow scenarios, such as a base forecast, tender forecast, current forecast, or recovery scenario.
+See [`documentation/deployment.md`](documentation/deployment.md) for the production web-root/Passenger layout and deployment rules.
 
-Each cash-flow scenario owns its activities and commercial assumptions. The backend recalculates the project snapshot from active activities and is authoritative for the financial calculation.
+## Tests
 
-## Calculation documentation
+Run the backend suite with:
 
-The canonical reference for terminology, formulas, timing conventions, assumptions, validation rules, and test invariants is:
+```bash
+pytest
+```
 
-[`documentation/cashflow_model.md`](documentation/cashflow_model.md)
+When a change also affects Flutter behavior or shared input/output contracts, run the Flutter repository tests as well.
 
-Code, clients, exports, and future AI-assisted project setup should follow that document rather than duplicating calculation assumptions independently.
+## Detailed references
 
-## Other documentation
-
-- [`documentation/security.md`](documentation/security.md) — security notes.
-- `docs/superpowers/specs/` — implementation/design specifications. These describe development decisions and are not the authoritative cash-flow formula reference.
+- [`documentation/reference/cashflow_model.md`](documentation/reference/cashflow_model.md) — canonical calculation model.
+- [`documentation/reference/cashflow_json_format.md`](documentation/reference/cashflow_json_format.md) — portable scenario format.
+- [`documentation/reference/security.md`](documentation/reference/security.md) — QAuth/JWT and Unit authorization.
