@@ -23,7 +23,8 @@ The independent-inflow settings were added as optional V1 fields. A V1 file crea
 - Percentage-like values are stored as API fractions: `0.10` means 10%, `0.50` means 50%, and `1.0` means 100%.
 - Timing values are integer model **periods**. The JSON format does not assume that a period is necessarily a calendar month.
 - `advance + retention` must not exceed `1.0` at either client or subcontract level.
-- Activity `skew` and active independent `inflow_curve_skew` must be strictly greater than `-1` and strictly less than `1`.
+- Activity `skew`, and non-null independent `inflow_curve_skew`, must be strictly greater than `-1` and strictly less than `1`.
+- A null `inflow_curve_skew` is interpreted as the balanced value `0.0`; it does not disable independent inflow.
 - Activity cost and duration must be greater than zero.
 - Payment delay, DLP, start, pre-work, and no-billing periods must be non-negative integers.
 
@@ -65,7 +66,7 @@ Otherwise the calculator uses the activity-linked contract-value method.
 - `"s_curve"`; or
 - `"linear"`.
 
-`inflow_curve_skew` controls front-loading/back-loading of the S-curve using the normal CashFlowPot skew convention. It is retained but has no calculation effect for a linear curve.
+`inflow_curve_skew` controls front-loading/back-loading of the S-curve using the normal CashFlowPot skew convention. A null value is treated as `0.0`. The value is retained but has no calculation effect for a linear curve.
 
 ### WIEB
 
