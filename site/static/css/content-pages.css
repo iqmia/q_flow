@@ -1,0 +1,166 @@
+.brand {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.brand__home {
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.brand__logo {
+  width: 44px;
+  height: 44px;
+  display: block;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.brand__parent {
+  grid-column: 2;
+}
+
+.site-footer__inner {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: start;
+  gap: 48px;
+  padding-block: 36px;
+}
+
+.site-footer__groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.site-footer__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.site-footer__group strong {
+  color: var(--text);
+}
+
+.site-footer__group a {
+  text-decoration: none;
+}
+
+.site-footer__attribution p {
+  margin: 0 0 10px;
+}
+
+.site-footer__meta {
+  flex: initial;
+}
+
+.legal-content {
+  max-width: 780px;
+}
+
+.legal-content h2 {
+  margin-top: 44px;
+}
+
+.legal-content p,
+.legal-content li {
+  color: var(--text-muted);
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.contact-card {
+  display: block;
+  padding: 24px;
+  text-decoration: none;
+}
+
+.contact-card p:last-child {
+  margin-bottom: 0;
+  color: var(--text-muted);
+}
+
+.brand-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 24px;
+}
+
+.brand-hero__logo {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+@media (max-width: 900px) {
+  .site-footer__inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .site-header__inner {
+    gap: 12px;
+  }
+
+  .site-nav {
+    gap: 10px;
+  }
+
+  .site-nav__link {
+    display: none;
+  }
+
+  .button--primary {
+    display: inline-flex;
+  }
+
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand__logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand__name {
+    font-size: 1rem;
+  }
+
+  .brand__parent {
+    font-size: 0.66rem;
+  }
+
+  .site-footer__groups {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-hero__logo {
+    width: 88px;
+    height: 88px;
+  }
+}
