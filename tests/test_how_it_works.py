@@ -53,7 +53,7 @@ class HowItWorksPageTest(TestCase):
             'Payment period',
             'WIEB',
             'subcontracted share',
-            'peak negative cash',
+            'Peak negative cash',
             'working capital',
             'lender review',
             'mid-project reforecast',
