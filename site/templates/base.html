@@ -9,12 +9,16 @@
   {% block canonical_url %}{% endblock %}
   {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="/assets/css/site.css">
+  <link rel="stylesheet" href="/assets/css/content-pages.css">
 </head>
 <body>
   <header class="site-header">
     <div class="site-shell site-header__inner">
       <div class="brand">
-        <a class="brand__name" href="/" aria-label="CashflowPot home">CashflowPot</a>
+        <a class="brand__home" href="/" aria-label="CashflowPot home">
+          <img class="brand__logo" src="/app/icons/Icon-192.png" alt="" width="44" height="44">
+          <span class="brand__text"><span class="brand__name">CashflowPot</span></span>
+        </a>
         <a class="brand__parent" href="https://quollnet.com/apps/cashflowpot">A Quollnet product</a>
       </div>
       <nav class="site-nav" aria-label="Primary navigation">
@@ -32,8 +36,26 @@
 
   <footer class="site-footer">
     <div class="site-shell site-footer__inner">
-      <p>CashflowPot is part of the Quollnet ecosystem for engineering and construction. <a href="https://quollnet.com/apps/cashflowpot">Explore CashflowPot on Quollnet</a>.</p>
-      <p class="site-footer__meta">Construction cash-flow forecasting by Quollnet.</p>
+      <div class="site-footer__groups">
+        <nav class="site-footer__group" aria-label="Product links">
+          <strong>Product</strong>
+          <a href="/how-it-works/">How it works</a>
+          <a href="/methodology/">Methodology</a>
+          <a href="/about/">About</a>
+          <a href="/app/">Open app</a>
+        </nav>
+        <nav class="site-footer__group" aria-label="Company and support links">
+          <strong>Company &amp; support</strong>
+          <a href="/contact/">Contact</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
+          <a href="https://quollnet.com/apps/cashflowpot">CashflowPot on Quollnet</a>
+        </nav>
+      </div>
+      <div class="site-footer__attribution">
+        <p>CashflowPot is part of the Quollnet ecosystem for engineering and construction. <a href="https://quollnet.com/apps/cashflowpot">Explore CashflowPot on Quollnet</a>.</p>
+        <p class="site-footer__meta">Construction cash-flow simulation and forecasting by Quollnet.</p>
+      </div>
     </div>
   </footer>
 </body>
