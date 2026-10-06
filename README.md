@@ -1,8 +1,8 @@
 # q_flow
 
-`q_flow` is the authoritative backend and calculation engine for CashFlowPot, and it also contains the source/build foundation for the public CashflowPot website.
+`q_flow` is the authoritative backend and calculation engine for CashflowPot, and it also contains the source/build foundation for the public CashflowPot website.
 
-CashFlowPot is a lightweight construction project cash-flow forecasting application. It estimates project cash inflow, outflow, net cash flow, and funding position from project and activity assumptions without attempting to reproduce a fully resource- or quantity-loaded programme.
+CashflowPot is a lightweight construction project cash-flow forecasting application. It estimates project cash inflow, outflow, net cash flow, and funding position from project and activity assumptions without attempting to reproduce a fully resource- or quantity-loaded programme.
 
 ## Public deployment
 
