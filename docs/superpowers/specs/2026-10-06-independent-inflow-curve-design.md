@@ -6,9 +6,9 @@ Date: 2026-10-06
 
 Allow each CashflowPot scenario to choose how the main-contract value-of-work curve is generated before client billing/payment terms are applied.
 
-The backend will support two calculation methods:
+The backend supports two calculation methods:
 
-1. **Independent contract curve** — the default for new scenarios. Contract value follows its own linear or S-curve over the project execution horizon.
+1. **Independent contract curve** — the default for newly created scenarios. Contract value follows its own linear or S-curve over the derived project execution horizon.
 2. **Activity-linked curve** — the existing behavior. The combined activity cost-work curve is scaled to contract value.
 
 The activity model continues to determine project outflow and project execution duration in both cases.
@@ -22,11 +22,11 @@ CashflowPot models inflow and outflow as related but distinct forecasts.
 - **Outflow** comes from activity work, self-performed costs, subcontracted costs, and subcontract commercial/payment terms.
 - **Inflow** starts from a contract-value work curve and is then converted to receipts through client WIEB, advance recovery, retention, payment delay, and DLP.
 
-The new independent method does not require activity selling values, per-activity markup, or a Schedule of Values.
+The independent method does not require activity selling values, per-activity markup, or a Schedule of Values.
 
 ## Project Duration
 
-There is no separate editable contract duration in this phase.
+There is no separate editable contract duration.
 
 The project execution horizon remains derived from the active activity work series:
 
@@ -46,45 +46,56 @@ Add these fields to `Cashflow`:
 
 ```text
 use_independent_inflow_curve : bool
-inflow_curve_type            : string
-inflow_curve_skew            : float
+inflow_curve_type            : string | null
+inflow_curve_skew            : float | null
 ```
 
-### `use_independent_inflow_curve`
+Application/model defaults for newly created scenarios:
 
-Meaning:
+```text
+use_independent_inflow_curve = true
+inflow_curve_type            = "s_curve"
+inflow_curve_skew            = 0.0
+```
 
-- `True` — generate the contract-value work curve independently from activity timing/profile.
-- `False` — preserve the existing activity-linked contract-value calculation.
+### Calculation-method rule
 
-Application/model default for newly created scenarios: `True`.
+Use the independent contract curve only when both conditions are true:
 
-Compatibility requirement: scenarios that already exist before this feature is introduced must remain on the current activity-linked method so their historical results do not silently change. Database migration/backfill therefore sets existing rows to `False`, while the model/default used for newly created rows is `True`.
+```text
+use_independent_inflow_curve is True
+AND
+inflow_curve_type is not NULL
+```
+
+Otherwise, use the existing activity-linked calculation.
+
+This rule provides backward compatibility without a data backfill. Existing database rows may have `NULL` for the newly added fields and therefore continue using the activity-linked model automatically.
 
 ### `inflow_curve_type`
 
-Allowed values:
+Allowed non-null values:
 
 ```text
 s_curve
 linear
 ```
 
-Default: `s_curve`.
+For newly created scenarios the default is `s_curve`.
 
-This controls only the independent contract curve. It is stored even when `use_independent_inflow_curve == False` so switching methods does not lose the user's independent-curve configuration.
+A `NULL` value means the independent method is not active, even if the boolean is true. This is the compatibility fallback for scenarios created before these fields existed.
 
 ### `inflow_curve_skew`
 
 Controls front-loading/back-loading of the independent S-curve using the existing `Work` curve convention.
 
-Validation:
+For an active independent curve, validation is:
 
 ```text
 -1 < inflow_curve_skew < 1
 ```
 
-Default: `0.0`.
+New-scenario default: `0.0`.
 
 Interpretation:
 
@@ -92,13 +103,15 @@ Interpretation:
 - zero — balanced reference curve;
 - positive — front-loaded.
 
-For `linear`, the skew value is retained but does not affect the generated curve.
+For `linear`, the stored skew value does not affect the generated curve.
 
 ## Calculation Behavior
 
-### Existing activity-linked method
+### Activity-linked method
 
-When `use_independent_inflow_curve == False`, keep the current logic unchanged:
+Use this method whenever the independent-method rule is false.
+
+Keep the current logic unchanged:
 
 ```text
 activity work curves
@@ -113,7 +126,15 @@ The current `factored_work()` behavior remains the compatibility reference.
 
 ### Independent contract curve
 
-When `use_independent_inflow_curve == True`:
+When:
+
+```text
+use_independent_inflow_curve is True
+AND
+inflow_curve_type is not NULL
+```
+
+then:
 
 1. derive `execution_duration` from the active activity work series;
 2. generate a `Work` curve using:
@@ -139,14 +160,14 @@ The independent contract-value work series must sum to `contract_value` within n
 
 Refactor the calculator so client inflow does not directly assume `factored_work()`.
 
-A clearer structure is:
+A clear structure is:
 
 ```text
-workflow()                 -> project cost-work series
-factored_work()            -> existing activity-linked contract-value series
-independent_contract_work()-> new independent contract-value series
-contract_work()            -> selects one of the above based on the scenario flag
-inflow()                   -> applies client commercial terms to contract_work()
+workflow()                  -> project cost-work series
+factored_work()             -> existing activity-linked contract-value series
+independent_contract_work() -> independent contract-value series
+contract_work()             -> selects the applicable method
+inflow()                    -> applies client commercial terms to contract_work()
 ```
 
 The exact helper names may vary during implementation, but the separation between **contract-value work generation** and **cash timing transformation** should remain explicit.
@@ -155,35 +176,38 @@ The exact helper names may vary during implementation, but the separation betwee
 
 Backend validation is authoritative.
 
-Validate:
+Rules:
 
-- `use_independent_inflow_curve` is a boolean;
-- `inflow_curve_type` is `s_curve` or `linear`;
-- `inflow_curve_skew` is finite and strictly between `-1` and `1`.
+- `use_independent_inflow_curve`, when supplied, must be a boolean;
+- `inflow_curve_type`, when non-null, must be `s_curve` or `linear`;
+- when the independent method is active, `inflow_curve_skew` must be finite and strictly between `-1` and `1`;
+- a null curve type always falls back to the activity-linked calculation.
 
 The new fields must be returned by normal cashflow/scenario API serialization and accepted by scenario create/update routes.
 
-Cashflow JSON import/export must preserve these fields. Existing version-1 imports that do not contain the fields remain valid and receive model defaults during import.
+Cashflow JSON import/export must preserve the new settings. Older imports that do not contain the fields remain valid; because an import creates a new scenario, normal model defaults may be applied to missing fields.
 
-## Migration / Existing Data
+## Database Compatibility
 
-Existing scenarios must not change calculation behavior merely because the backend was deployed.
+No existing scenario rows need to be updated or backfilled.
 
-Required migration semantics:
+A database **schema change is still required** to add the nullable columns. The columns should be introduced without a data-update step so existing rows can remain `NULL`.
+
+Compatibility then follows naturally:
 
 ```text
-existing rows:
-    use_independent_inflow_curve = false
-    inflow_curve_type = "s_curve"
-    inflow_curve_skew = 0.0
+existing row with no curve settings
+    -> inflow_curve_type is NULL
+    -> activity-linked calculation
 
-new rows after deployment:
-    use_independent_inflow_curve = true
-    inflow_curve_type = "s_curve"
-    inflow_curve_skew = 0.0
+new scenario created by the application
+    -> use_independent_inflow_curve = true
+    -> inflow_curve_type = "s_curve"
+    -> inflow_curve_skew = 0.0
+    -> independent calculation
 ```
 
-If the repository's deployment does not currently use an Alembic migration directory, implementation must still provide an explicit production-safe schema/backfill step rather than relying on SQLAlchemy model defaults to alter an existing table.
+This avoids a data migration while preserving previous forecast behavior.
 
 ## Invariants
 
@@ -208,17 +232,18 @@ Commercial variables alter timing, not lifetime contract value.
 
 Backend tests should cover at least:
 
-- new Cashflow model defaults select independent inflow;
-- migration/backfill semantics preserve activity-linked behavior for pre-existing rows;
+- newly created Cashflow scenarios default to independent inflow with `s_curve` and zero skew;
+- a null `inflow_curve_type` always uses the activity-linked method;
+- `use_independent_inflow_curve = false` uses the activity-linked method even when curve settings exist;
 - independent linear curve distributes contract value across the derived duration and sums to contract value;
 - independent S-curve uses skew and sums to contract value;
 - positive and negative skew produce different timing shapes from the balanced curve;
 - activity-linked mode reproduces the current `factored_work()` result unchanged;
 - switching inflow method does not alter activity work/outflow calculations;
-- client WIEB, advance, retention, payment delay and DLP still operate on whichever contract-work series is selected;
+- client WIEB, advance, retention, payment delay and DLP operate on whichever contract-work series is selected;
 - no-active-activity scenarios still return an empty forecast;
 - invalid flag/type/skew values are rejected;
-- import/export preserves the new settings while older imports remain accepted;
+- import/export preserves the new settings and older imports remain accepted;
 - full existing backend test suite remains green.
 
 ## Out of Scope for This Backend Phase
