@@ -150,9 +150,42 @@ class CashflowCalculator():
         factor = self.project.contract_value / self.cost
         return [value * factor for value in t_work]
 
+    def independent_contract_work(self) -> list:
+        """Generate contract-value work independently over activity duration."""
+        if not self.work_cf or self.duration <= 0:
+            return []
+
+        curve_type = getattr(self.project, "inflow_curve_type", None)
+        if curve_type == "linear":
+            work_type = "l"
+        elif curve_type == "s_curve":
+            work_type = "s"
+        else:
+            raise ValueError(f"Unsupported inflow curve type: {curve_type}")
+
+        skew = getattr(self.project, "inflow_curve_skew", 0.0)
+        if skew is None:
+            skew = 0.0
+
+        return Work(
+            self.duration,
+            skew,
+            self.project.contract_value,
+            work_type,
+        ).marginal_work()
+
+    def contract_work(self) -> list:
+        """Return the selected contract-value work series for client billing."""
+        if (
+            getattr(self.project, "use_independent_inflow_curve", None) is True
+            and getattr(self.project, "inflow_curve_type", None) is not None
+        ):
+            return self.independent_contract_work()
+        return self.factored_work()
+
     def inflow(self) -> list:
         """Calculate client receipts from work, payment terms, and retention."""
-        t_work = self.factored_work()
+        t_work = self.contract_work()
         if not t_work:
             return []
 
@@ -290,7 +323,6 @@ class CashflowCalculator():
         This method will print the gantt chart for the project. It will show the
         start and end of each activity and the total duration of the project.
         '''
-        click.echo(click.style("\n\n**** Project Gantt Chart ****", fg="blue"))
         table = PrettyTable(["Activity", "Start", "End", "Duration"])
         table.align = "l"
         for activity in self.project.activities:
