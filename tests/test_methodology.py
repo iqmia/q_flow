@@ -33,13 +33,15 @@ class MethodologyPageTest(TestCase):
         self.assertIn('A forecast designed to be revised', html)
         self.assertIn('minutes, not weeks', html)
 
-    def test_page_follows_calculation_sequence(self):
+    def test_page_follows_current_calculation_sequence(self):
         html = self._html()
 
         for concept in (
-            'Contract side — from work to inflow',
-            'Execution side — from activity work to outflow',
-            'Net cash and financing',
+            'Main-contract inflow',
+            'Independent contract curve',
+            'Activity-linked inflow',
+            'Execution and outflow',
+            'Cash position',
             'Contract-value work',
             'Project outflow',
             'financing rate',
@@ -49,26 +51,29 @@ class MethodologyPageTest(TestCase):
         for formula in (
             'Value factor = Contract value / Total entered activity cost',
             'Net cash flow = Inflow − Outflow',
-            'Project outflow = Σ Activity outflow',
+            'Σ Activity outflow = Activity estimated cost',
         ):
             self.assertIn(formula, html)
 
     def test_page_explains_wieb_as_forecasting_assumption(self):
         html = self._html()
 
-        self.assertIn('Work in Excess of Billings (WIEB) assumption (%)', html)
-        self.assertIn('share of work performed in a period that is not yet billable', html)
-        self.assertIn('carried into the following billing period', html)
-        self.assertIn('Self-performed work is not adjusted by WIEB', html)
-        self.assertIn('cost is generally incurred when the work is performed', html)
+        self.assertIn('Work in Excess of Billings (WIEB)', html)
+        self.assertIn('forecasting assumption', html)
+        self.assertIn('share of completed work not billed in the current period', html)
+        self.assertIn('carry part of each period', html)
+        self.assertIn('into the next period', html)
+        self.assertIn('Direct cost is paid as incurred', html)
+        self.assertIn('WIEB changes timing, not the lifetime value of the work', html)
 
-    def test_page_states_current_markup_assumption_and_future_direction(self):
+    def test_page_explains_activity_linked_value_factor_without_sov_roadmap(self):
         html = self._html()
 
-        self.assertIn('same contract-value-to-cost factor', html)
-        self.assertIn('does not currently store a separate selling value for each activity', html)
-        self.assertIn('Activity-specific selling value and markup allocation', html)
-        self.assertIn('planned extension', html)
+        self.assertIn('combined activity cost-work profile is scaled proportionally to the contract value', html)
+        self.assertIn('Neither method tries to infer activity selling prices, markup allocation or a Schedule of Values', html)
+        self.assertIn('common factor describes the project-level profile', html)
+        self.assertNotIn('Activity-specific selling value and markup allocation', html)
+        self.assertNotIn('planned extension', html)
 
     def test_page_exposes_model_invariants_and_limits(self):
         html = self._html()
@@ -81,7 +86,8 @@ class MethodologyPageTest(TestCase):
             self.assertIn(invariant, html)
 
         self.assertIn('forecast, not a guarantee', html)
-        self.assertIn('Primavera P6', html)
-        self.assertIn('MS Project', html)
+        self.assertIn('time-phased work or cost', html)
+        self.assertIn('mathematical execution profile', html)
+        self.assertNotIn('CashflowPot does not replace Primavera P6', html)
         self.assertIn('href="/app/"', html)
         self.assertIn('href="/how-it-works/"', html)
