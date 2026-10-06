@@ -106,7 +106,7 @@ inflow_curve_type is not NULL
 
 Otherwise the calculator uses the activity-linked contract-value curve.
 
-`inflow_curve_type` accepts `s_curve` or `linear`. `inflow_curve_skew` uses the same greater-than-`-1` and less-than-`1` convention as the existing `Work` curve. Negative values back-load the S-curve, zero is the balanced reference curve, and positive values front-load it. Skew is retained but has no effect when the curve type is `linear`.
+`inflow_curve_type` accepts `s_curve` or `linear`. `inflow_curve_skew`, when non-null, uses the same greater-than-`-1` and less-than-`1` convention as the existing `Work` curve. Negative values back-load the S-curve, zero is the balanced reference curve, and positive values front-load it. A NULL skew is interpreted as the balanced value `0.0` and does not disable independent inflow. Skew is retained but has no effect when the curve type is `linear`.
 
 Existing database rows may have these new columns as `NULL`. No data backfill is required: the NULL curve type naturally keeps those rows on the activity-linked calculation. New scenarios default to independent S-curve generation.
 
@@ -368,7 +368,7 @@ The engine uses the existing `Work` curve mathematics with:
 ```text
 duration = execution_duration
 value    = contract_value
-skew     = inflow_curve_skew
+skew     = inflow_curve_skew, with NULL treated as 0.0
 curve    = inflow_curve_type
 ```
 
@@ -566,7 +566,7 @@ Project/cash-flow inputs require:
 - DLP and payment delay: non-negative integers;
 - `use_independent_inflow_curve`: boolean or NULL;
 - `inflow_curve_type`: `s_curve`, `linear`, or NULL; and
-- when independent mode is active, `inflow_curve_skew`: finite and strictly greater than -1 and less than 1.
+- `inflow_curve_skew`, when non-null: finite and strictly greater than -1 and less than 1. A NULL skew is interpreted as `0.0` and does not affect method selection.
 
 Activity inputs require:
 
@@ -673,7 +673,7 @@ Changes to the calculation engine should preserve or deliberately revise the fol
 2. Total activity outflow sums to the activity estimated cost.
 3. Total project inflow sums to the contract value for valid terms.
 4. Independent contract work sums to the contract value and has the same period count as the derived execution duration.
-5. The independent method is selected only when `use_independent_inflow_curve is True` and `inflow_curve_type` is not NULL; otherwise activity-linked calculation is used.
+5. The independent method is selected only when `use_independent_inflow_curve is True` and `inflow_curve_type` is not NULL; otherwise activity-linked calculation is used. A NULL skew does not disable independent mode and is treated as balanced `0.0`.
 6. Changing the inflow method does not change activity work or outflow.
 7. WIEB shifts timing only and applies from the first billing period.
 8. A payment delay of N shifts progress cash exactly N periods, independent of advance payment.
