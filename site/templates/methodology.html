@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}CashflowPot Methodology | Construction Cash-Flow Model{% endblock %}
+{% block description %}Understand how CashflowPot converts activity work, contract terms, subcontract conditions and financing assumptions into project inflow, outflow and cash position.{% endblock %}
+{% block canonical_url %}<link rel="canonical" href="https://cashflowpot.com/methodology/">{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Methodology</p>
+      <h1>A forecast designed to be revised</h1>
+      <p class="hero__lead">Construction cash flow depends on information that changes throughout a project: activity timing, progress, certification, payment timing, subcontracting, variations and commercial decisions.</p>
+      <p class="hero__support">CashflowPot therefore does not try to create a permanently precise prediction. It creates a transparent forecast from the information available now, using a repeatable model that can be recalculated quickly when reality changes. When the forecast will need to change anyway, updating it should take minutes, not weeks.</p>
+      <div class="hero__actions">
+        <a class="button button--primary" href="/app/">Build a forecast</a>
+        <a class="button" href="/how-it-works/">See how it works</a>
+      </div>
+    </div>
+    <aside class="card content-card" aria-label="CashflowPot calculation overview">
+      <p class="eyebrow">Contractor point of view</p>
+      <ol class="clean-list">
+        <li>Build activity work curves</li>
+        <li>Convert combined work into client-side contract value</li>
+        <li>Apply client billing and payment conditions to create inflow</li>
+        <li>Apply activity and subcontract conditions to create outflow</li>
+        <li>Combine inflow and outflow to calculate net cash and financing</li>
+      </ol>
+    </aside>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="principle-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">The basic principle</p>
+      <h2 id="principle-title">Work happens first. Cash timing comes second.</h2>
+    </div>
+    <div>
+      <p>CashflowPot separates the physical/economic progress of the project from the commercial conditions that determine when money is actually received or paid.</p>
+      <p>First, each activity produces a value-of-work pattern over time. Then the relevant contract, billing and payment assumptions transform that work into cash.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="inflow-title">
+  <div class="site-shell">
+    <p class="eyebrow">Main contract · contractor point of view</p>
+    <h2 id="inflow-title">Contract side — from work to inflow</h2>
+    <div class="split-section">
+      <div>
+        <h3>1. Build the project work curve</h3>
+        <p>Each activity is calculated as either a linear work distribution or a skewed S-curve. The activity work curves are then summed to create the project cost-loaded work curve.</p>
+        <div class="card content-card">
+          <p><strong>Project cost work(t)</strong></p>
+          <p><code>Project cost work(t) = Σ Activity work(t)</code></p>
+        </div>
+      </div>
+      <div>
+        <h3>2. Convert cost-loaded work to contract-value work</h3>
+        <p>The current model uses the same contract-value-to-cost factor across all entered activities.</p>
+        <div class="card content-card">
+          <p><code>Value factor = Contract value / Total entered activity cost</code></p>
+          <p><code>Contract-value work(t) = Project cost work(t) × Value factor</code></p>
+        </div>
+        <p>This means CashflowPot does not currently store a separate selling value for each activity. The contract value is distributed proportionally to entered activity cost.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="client-cash-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Second pass</p>
+      <h2 id="client-cash-title">Turn contract-value work into cash receipts</h2>
+      <p>The contract-value work curve represents work executed. It is not yet the cash-in curve. CashflowPot then applies the client-side commercial assumptions that affect billing, certification and payment timing.</p>
+    </div>
+    <div class="card content-card">
+      <ul class="clean-list">
+        <li>Client advance payment and proportional recovery</li>
+        <li>Work in Excess of Billings (WIEB) assumption (%)</li>
+        <li>Retention withheld from progress receipts</li>
+        <li>Payment period between billing and receipt</li>
+        <li>Retention released at completion</li>
+        <li>Remaining retention released after the Defects Liability Period (DLP)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="wieb-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Billing reality</p>
+      <h2 id="wieb-title">Work in Excess of Billings (WIEB) assumption (%)</h2>
+      <p>In practice, not all work performed in a period is immediately billable. Work may still be incomplete, awaiting inspection or approval, affected by an NCR, or otherwise not ready for certification.</p>
+      <p>CashflowPot uses a percentage assumption to estimate the share of work performed in a period that is not yet billable and is carried into the following billing period.</p>
+    </div>
+    <div class="card content-card">
+      <p><strong>Example — WIEB assumption 20%</strong></p>
+      <p>If 100 of otherwise billable work is performed in the current period, 80 is billed in the current period and 20 is carried into the next billing period.</p>
+      <p><code>Billed(t) = Work(t) × (1 − WIEB) + Work(t−1) × WIEB</code></p>
+      <p>The percentage is a forecasting assumption used to simulate WIEB. The actual WIEB is the resulting value of performed work that remains unbilled.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="outflow-title">
+  <div class="site-shell">
+    <p class="eyebrow">Project execution · contractor point of view</p>
+    <h2 id="outflow-title">Execution side — from activity work to outflow</h2>
+    <div class="split-section">
+      <div>
+        <h3>1. Calculate each activity work curve</h3>
+        <p>An activity can use a linear distribution or a skewed S-curve depending on how that work is expected to progress. A general-requirements activity may be broadly linear; trade activities often ramp up and down and are better represented by a curved distribution.</p>
+        <div class="card content-card">
+          <p><code>Linear cumulative work(t) = Activity cost / Duration × t</code></p>
+          <p>For non-linear activities, the skew parameter changes whether work is relatively front-loaded, balanced or back-loaded.</p>
+        </div>
+      </div>
+      <div>
+        <h3>2. Split execution cost by procurement route</h3>
+        <p>Each period's activity work is divided into self-performed/direct cost and subcontracted cost.</p>
+        <div class="card content-card">
+          <p><code>Self-performed cost(t) = Activity work(t) × (1 − Subcontracted share)</code></p>
+          <p><code>Subcontracted work(t) = Activity work(t) × Subcontracted share</code></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="execution-cash-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Two cost patterns</p>
+      <h2 id="execution-cash-title">Self-performed and subcontracted work behave differently</h2>
+    </div>
+    <div>
+      <div class="card content-card">
+        <h3>Self-performed / direct cost</h3>
+        <p><strong>Self-performed work is not adjusted by WIEB.</strong> Even if the related work cannot yet be billed or certified to the client, the labour, plant, materials and other direct cost is generally incurred when the work is performed.</p>
+        <p>The current model therefore records the non-subcontracted share in the same period as activity work.</p>
+      </div>
+      <div class="card content-card" style="margin-top: 16px;">
+        <h3>Subcontracted share</h3>
+        <p>The subcontracted portion follows its own commercial relationship. Its executed work can be transformed into cash payments using subcontract-specific advance, WIEB, no-billing period, retention, payment delay and DLP assumptions.</p>
+        <p><code>Project outflow = Σ Activity outflow</code></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="terms-title">
+  <div class="site-shell">
+    <p class="eyebrow">Core terminology</p>
+    <h2 id="terms-title">The assumptions that move work into cash</h2>
+    <div class="audience-grid">
+      <article class="card feature-card">
+        <h3>Advance payment</h3>
+        <p>An amount paid at the beginning of the relevant relationship and recovered proportionally from later progress payments.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Retention</h3>
+        <p>A percentage withheld from progress payments and released later. CashflowPot models a first release at completion and the remaining release after the DLP.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Payment period</h3>
+        <p>The number of model periods between billing and actual receipt or payment.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Defects Liability Period (DLP)</h3>
+        <p>The number of model periods between the first retention release and release of the remaining retention.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>No-billing period</h3>
+        <p>An initial subcontract period in which work may occur but no progress bill is issued. The accumulated work is included in the first bill after that period.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Pre-work period</h3>
+        <p>An initial period before an activity's main cost-loaded work begins. The current backend retains a legacy mobilization-period field for this behavior.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Subcontracted share</h3>
+        <p>The fraction of an activity cost that follows subcontract billing and payment assumptions. The remainder is treated as self-performed/direct cost.</p>
+      </article>
+      <article class="card feature-card">
+        <h3>Curve skew</h3>
+        <p>Controls the timing shape of a non-linear activity. Positive skew front-loads the current curve relative to the balanced case; negative skew back-loads it.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="net-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Bring the two sides together</p>
+      <h2 id="net-title">Net cash and financing</h2>
+      <p>Once project inflow and project outflow exist for each period, CashflowPot calculates the net position and carries that balance through time.</p>
+    </div>
+    <div class="card content-card">
+      <p><code>Net cash flow = Inflow − Outflow</code></p>
+      <p><code>Pre-finance balance(t) = Previous balance + Net cash flow(t)</code></p>
+      <p>If the balance is negative, the current engine applies the financing rate for that model period:</p>
+      <p><code>Balance(t) = Pre-finance balance(t) × (1 + financing rate)</code></p>
+      <p>If the balance is positive, the current model does not add interest income.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="time-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Time convention</p>
+      <h2 id="time-title">The engine works in periods</h2>
+    </div>
+    <div>
+      <p>CashflowPot normally uses monthly periods, but the calculation engine itself works in integer periods. Timing assumptions within one scenario must use the same unit.</p>
+      <p>A payment period of 2 means the related progress amount is shifted by exactly two model periods. A DLP of 12 means the remaining retention is released twelve periods after the first retention-release point. The financing rate is also a rate per model period.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="markup-title">
+  <div class="site-shell">
+    <div class="card ai-card">
+      <div>
+        <p class="eyebrow">Planned model extension</p>
+        <h2 id="markup-title">Activity-specific selling value and markup allocation</h2>
+        <p>Today, CashflowPot uses the same contract-value-to-cost factor across activities. That is deliberately simple, but it does not represent a contractor's ability to distribute markup differently across the Schedule of Values.</p>
+        <p><strong>Activity-specific selling value and markup allocation is a planned extension.</strong> It will allow the inflow model to reflect where contract value and margin are actually placed—for example, allocating a higher markup to earlier activities to improve the early cash position—while keeping the overall contract value controlled.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="checks-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Model checks</p>
+      <h2 id="checks-title">Key invariants</h2>
+      <p>Commercial terms change the timing of cash. For valid inputs, they should not create or destroy the underlying activity cost or contract value.</p>
+    </div>
+    <div class="card content-card">
+      <p><code>Σ Activity work = Activity estimated cost</code></p>
+      <p><code>Σ Activity outflow = Activity estimated cost</code></p>
+      <p><code>Σ Project inflow = Contract value</code></p>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="advanced-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Advanced detail</p>
+      <h2 id="advanced-title">Activity curve formula</h2>
+      <p>Most users only need to choose linear or a skewed activity curve. The calculation engine also corrects the non-linear curve so that total marginal work returns to the activity's estimated cost.</p>
+    </div>
+    <div>
+      <details class="card content-card">
+        <summary><strong>Show the non-linear curve formula</strong></summary>
+        <p>The raw cumulative non-linear curve is:</p>
+        <p><code>C_raw(t) = c × (s + 1) / ((s + 1) + exp(−(t / (0.1d) + s² − 5)))</code></p>
+        <p>The engine calculates the residual between the resulting marginal work and activity cost, then applies a cubic cumulative correction over the duration before differencing the curve again.</p>
+        <p><code>error_distribution(t) = −2 × error × t³ / d³ + 3 × error × t² / d²</code></p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="limits-title">
+  <div class="site-shell split-section">
+    <div>
+      <p class="eyebrow">Use the forecast for what it is</p>
+      <h2 id="limits-title">Assumptions and limitations</h2>
+    </div>
+    <div>
+      <p>CashflowPot produces a <strong>forecast, not a guarantee</strong>. Its usefulness depends on the quality and currency of the assumptions supplied.</p>
+      <ul class="clean-list">
+        <li>The current model allocates contract value proportionally to activity cost.</li>
+        <li>It is activity-based rather than labour-, plant-, material- or quantity-resource loaded.</li>
+        <li>It is not Primavera P6, MS Project, ERP, accounting software or contractual certification software.</li>
+        <li>It does not perform delay or entitlement analysis.</li>
+        <li>The current financing model applies a per-period rate only while the cumulative balance is negative.</li>
+      </ul>
+      <p>The goal is not to pretend uncertainty can be removed. The goal is to use the information currently in hand, make the assumptions visible, and make the forecast fast enough to revise when the project changes.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section final-cta" aria-labelledby="method-cta-title">
+  <div class="site-shell final-cta__inner">
+    <div>
+      <p class="eyebrow">From methodology to decision</p>
+      <h2 id="method-cta-title">Build the forecast, review the assumptions, and revise it as reality changes.</h2>
+    </div>
+    <div class="hero__actions">
+      <a class="button button--primary" href="/app/">Build a forecast</a>
+      <a class="button" href="/how-it-works/">See how it works</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
