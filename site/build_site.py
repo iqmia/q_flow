@@ -17,6 +17,7 @@ DEFAULT_OUTPUT_DIR = SITE_DIR / 'dist'
 PAGES: tuple[tuple[str, str], ...] = (
     ('index.html', 'index.html'),
     ('how-it-works.html', 'how-it-works/index.html'),
+    ('methodology.html', 'methodology/index.html'),
     ('404.html', '404.html'),
 )
 
