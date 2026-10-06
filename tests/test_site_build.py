@@ -114,6 +114,12 @@ class SiteBuildTest(TestCase):
         template = BASE_TEMPLATE.read_text(encoding='utf-8')
         self.assertIn('/app/icons/Icon-192.png', template)
 
+    def test_brand_keeps_logo_beside_stacked_product_and_parent_labels(self):
+        template = BASE_TEMPLATE.read_text(encoding='utf-8')
+        self.assertIn('class="brand__logo-link"', template)
+        self.assertIn('class="brand__name" href="/"', template)
+        self.assertIn('class="brand__parent"', template)
+
     def test_shared_css_supports_logo_footer_groups_and_small_screens(self):
         page_css = (REPO_ROOT / 'site' / 'static' / 'css' / 'content-pages.css').read_text(encoding='utf-8')
         for token in (
@@ -254,6 +260,7 @@ class SiteBuildTest(TestCase):
             '/article/master_construction_project_cashflow_with_cashflowpot',
             'Billing Deferral', 'Activity-specific selling value and markup allocation',
             'CashflowPot does not replace Primavera P6',
+            'use_independent_inflow_curve', 'inflow_curve_type', 'inflow_curve_skew',
         ):
             self.assertNotIn(forbidden, html)
         folded = html.casefold()
