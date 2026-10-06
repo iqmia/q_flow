@@ -59,11 +59,6 @@ def _require_permission(user, unit_id, permission):
     return result, None
 
 
-@projects.route("/api", methods=["GET"])
-def api():
-    return jsonify(message="Welcome to the Q-Flow API"), 200
-
-
 @projects.route("/projects")
 @auth_required
 def get_projects(user):
