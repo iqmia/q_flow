@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}CashflowPot{% endblock %}</title>
+  <meta name="description" content="{% block description %}{% endblock %}">
+  {% block canonical_url %}{% endblock %}
+  <link rel="stylesheet" href="/assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-shell site-header__inner">
+      <a class="brand" href="/" aria-label="CashflowPot home">
+        <span class="brand__name">CashflowPot</span>
+        <span class="brand__parent">A Quollnet product</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a class="button button--primary" href="/app/">Open app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-shell site-footer__inner">
+      <p>CashflowPot is part of the <a href="https://quollnet.com/">Quollnet ecosystem</a>.</p>
+      <p class="site-footer__meta">Construction cash-flow forecasting by Quollnet.</p>
+    </div>
+  </footer>
+</body>
+</html>
