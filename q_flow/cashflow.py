@@ -323,6 +323,7 @@ class CashflowCalculator():
         This method will print the gantt chart for the project. It will show the
         start and end of each activity and the total duration of the project.
         '''
+        click.echo(click.style("\n\n**** Project Gantt Chart ****", fg="blue"))
         table = PrettyTable(["Activity", "Start", "End", "Duration"])
         table.align = "l"
         for activity in self.project.activities:
