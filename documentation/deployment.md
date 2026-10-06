@@ -1,0 +1,271 @@
+# CashflowPot deployment
+
+This document describes the current production layout and the supported build/deploy workflow.
+
+## 1. Public topology
+
+CashflowPot uses one domain with three surfaces:
+
+```text
+https://cashflowpot.com/      static public website
+https://cashflowpot.com/app/  Flutter web application
+https://cashflowpot.com/api/  Flask API through Passenger
+```
+
+These are deployed separately even though the public website source and backend source both live in the `q_flow` repository.
+
+## 2. Server source layout
+
+The backend repository is checked out at:
+
+```text
+/home/iqmieeuk/q_flow
+```
+
+Relevant source paths include:
+
+```text
+/home/iqmieeuk/q_flow/q_flow/          Flask package
+/home/iqmieeuk/q_flow/site/            public-site source
+/home/iqmieeuk/q_flow/site/dist/       generated public-site build
+/home/iqmieeuk/q_flow/passenger_wsgi.py
+```
+
+The public web root is:
+
+```text
+~/www.cashflowpot.com
+```
+
+which resolves to the account's CashflowPot domain directory.
+
+A representative production web-root layout is:
+
+```text
+~/www.cashflowpot.com/
+    index.html
+    404.html
+    assets/
+    how-it-works/
+    methodology/
+    about/
+    contact/
+    privacy/
+    terms/
+
+    app/        Flutter web build
+    api/        Passenger mount directory/configuration
+```
+
+## 3. Passenger API mount
+
+Namecheap/CloudLinux generated the Passenger configuration under the public `/api` mount:
+
+```apache
+PassengerAppRoot "/home/iqmieeuk/q_flow"
+PassengerBaseURI "/api"
+PassengerPython "/home/iqmieeuk/virtualenv/q_flow/3.9/bin/python"
+```
+
+The important distinction is:
+
+- Flask routes are defined internally without `/api`;
+- Passenger exposes the Flask application publicly below `/api`.
+
+For example, an internal Flask route `/health` is reached publicly as:
+
+```text
+https://cashflowpot.com/api/health
+```
+
+Do not add `/api` to every Flask route definition merely because production uses the Passenger base URI.
+
+## 4. Public-site builder
+
+The source-of-truth builder is:
+
+```text
+q_flow/site/build_site.py
+```
+
+The builder has two stages:
+
+1. `build_site()` creates a clean static build in `site/dist/` by default.
+2. `publish_site()` publishes only the static-site-owned entries to the production web root.
+
+The build directory is intentionally deleted and recreated on each build. The production web root is **not** deleted.
+
+### Site-owned production entries
+
+The publisher manages only the entries derived from the current public page list plus `assets`, currently including:
+
+```text
+index.html
+404.html
+assets/
+how-it-works/
+methodology/
+about/
+contact/
+privacy/
+terms/
+```
+
+Before copying a managed entry, the publisher replaces that entry only.
+
+It does **not** remove unrelated production entries such as:
+
+```text
+app/
+api/
+```
+
+This preservation is a deployment invariant. Do not change the builder to delete the entire production web root.
+
+## 5. Production public-site deployment
+
+On the production server, the normal public-site update is:
+
+```bash
+cd ~/q_flow
+git pull
+python site/build_site.py
+```
+
+With no flags, the command:
+
+1. builds the site into `site/dist/`;
+2. verifies that the production web root already exists;
+3. verifies that the generated build contains all managed entries; and
+4. publishes those managed entries to `~/www.cashflowpot.com`.
+
+If the production web root does not exist, publishing fails instead of creating an unexpected directory.
+
+## 6. Local public-site build
+
+For local development, use:
+
+```bash
+python site/build_site.py -l
+```
+
+or:
+
+```bash
+python site/build_site.py --local
+```
+
+Local mode builds `site/dist/` only. It does not look for or modify `~/www.cashflowpot.com`.
+
+A simple local preview can be started with:
+
+```bash
+python -m http.server 8000 --directory site/dist
+```
+
+### App-owned icons during local preview
+
+The public site currently reuses some icons from production paths such as:
+
+```text
+/app/icons/Icon-192.png
+/app/icons/quollnet_logo_transp.webp
+/app/icons/facebook.png
+```
+
+A server that exposes only `site/dist/` does not have `/app/`, so those images can be missing in the simple local preview. In production, `/app/` is deployed beside the static site under the same domain and the paths resolve normally.
+
+Do not duplicate app assets into the static-site build solely to make this limited preview mode self-contained unless the deployment architecture is deliberately changed.
+
+## 7. Flutter app deployment
+
+The Flutter web application is produced from the separate `iqmia/cashflowpot` repository and deployed under:
+
+```text
+https://cashflowpot.com/app/
+```
+
+`site/build_site.py` does not build, delete, or publish the Flutter app.
+
+The `/app/` directory must therefore be preserved when updating the public site.
+
+When Flutter assets change, rebuild/deploy the Flutter application using its own repository workflow.
+
+## 8. Backend deployment
+
+The Flask backend runs from the `q_flow` checkout referenced by `PassengerAppRoot`.
+
+A backend update generally involves updating the repository and then ensuring Passenger is using/restarting the updated application according to the hosting workflow.
+
+The public-site publisher does not restart Passenger and does not deploy the Flutter app.
+
+Keep these responsibilities separate:
+
+```text
+site/build_site.py     static public website
+Flutter build/deploy   /app/
+Passenger/q_flow       /api/
+```
+
+## 9. Environment and secrets
+
+Production configuration reads application secrets from the server environment/config files used by `q_flow` (currently `env.json` through the Config loader).
+
+Secrets such as application secrets, private credentials, mail credentials, and signing material must remain outside Git.
+
+The repository may document configuration key names, but must never contain real production secret values.
+
+See [`reference/security.md`](reference/security.md) for the QAuth/JWT configuration contract.
+
+## 10. Database and storage
+
+The current backend configures its SQLite database at:
+
+```text
+<STORAGE_PATH>/q_flow.db
+```
+
+The production `STORAGE_PATH` is currently configured within the q_flow server storage area.
+
+Treat the database and any stored project files as persistent server data. A repository pull or public-site build must not overwrite them.
+
+## 11. Deployment checks
+
+After a public-site deployment, check at minimum:
+
+```text
+https://cashflowpot.com/
+https://cashflowpot.com/how-it-works/
+https://cashflowpot.com/methodology/
+https://cashflowpot.com/contact/
+https://cashflowpot.com/app/
+https://cashflowpot.com/api/health
+```
+
+Also confirm that shared `/app/icons/...` images render on public pages that use them.
+
+After backend changes, run the backend test suite before deployment where practical:
+
+```bash
+pytest
+```
+
+For site-only local verification:
+
+```bash
+python site/build_site.py -l
+python -m unittest tests.test_site_build -v
+```
+
+## 12. Deployment rules
+
+1. `site/dist/` is generated output and is not committed.
+2. Normal `python site/build_site.py` means **build + production static-site publish**.
+3. `-l/--local` means **build only**.
+4. Never point a clean/delete operation at the entire production web root.
+5. `/app/` and `/api/` are not owned by the public-site publisher.
+6. Passenger owns the public `/api` prefix; Flask route definitions stay internally unprefixed.
+7. The public website may reuse `/app/icons/...` assets because `/app/` and the static site share the production domain.
+8. Server secrets and persistent data are not source-controlled deployment artifacts.
+
+Last reviewed: 7 October 2026.
