@@ -14,7 +14,9 @@ STATIC_DIR = SITE_DIR / 'static'
 DEFAULT_OUTPUT_DIR = SITE_DIR / 'dist'
 
 # Public pages are added here one by one after review.
-PAGES: tuple[tuple[str, str], ...] = ()
+PAGES: tuple[tuple[str, str], ...] = (
+    ('404.html', '404.html'),
+)
 
 
 def _environment() -> Environment:
