@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Page not found | CashflowPot{% endblock %}
+{% block description %}The page you’re looking for doesn’t exist or may have moved.{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block content %}
+<section class="error-page" aria-labelledby="error-title">
+  <div class="site-shell error-page__inner">
+    <p class="error-page__code" aria-hidden="true">404</p>
+    <h1 id="error-title">Page not found</h1>
+    <p class="error-page__message">The page you’re looking for doesn’t exist or may have moved.</p>
+    <div class="error-page__actions">
+      <a class="button button--primary" href="/">Back to CashflowPot</a>
+      <a class="button" href="/app/">Open app</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
