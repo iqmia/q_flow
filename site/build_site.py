@@ -18,6 +18,10 @@ PAGES: tuple[tuple[str, str], ...] = (
     ('index.html', 'index.html'),
     ('how-it-works.html', 'how-it-works/index.html'),
     ('methodology.html', 'methodology/index.html'),
+    ('about.html', 'about/index.html'),
+    ('contact.html', 'contact/index.html'),
+    ('privacy.html', 'privacy/index.html'),
+    ('terms.html', 'terms/index.html'),
     ('404.html', '404.html'),
 )
 
