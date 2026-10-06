@@ -33,6 +33,14 @@ class Cashflow(db.Model, BaseMixin):
     contract_value = db.Column(db.Float, default=0)
     wieb = db.Column(db.Float, default=0.2)
 
+    # Main-contract value-of-work generation. Existing database rows may keep
+    # these columns NULL; the calculator treats a NULL curve type as the
+    # activity-linked legacy method. New scenarios receive the independent
+    # S-curve defaults below.
+    use_independent_inflow_curve = db.Column(db.Boolean, nullable=True, default=True)
+    inflow_curve_type = db.Column(db.String(16), nullable=True, default="s_curve")
+    inflow_curve_skew = db.Column(db.Float, nullable=True, default=0.0)
+
     def compact_dict(self):
         return {
             "id": self.id,
