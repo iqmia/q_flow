@@ -1,8 +1,40 @@
 # q_flow
 
-`q_flow` is the authoritative backend and calculation engine for CashFlowPot.
+`q_flow` is the authoritative backend and calculation engine for CashFlowPot, and it also contains the source/build foundation for the public CashflowPot website.
 
 CashFlowPot is a lightweight construction project cash-flow forecasting application. It estimates project cash inflow, outflow, net cash flow, and funding position from project and activity assumptions without attempting to reproduce a fully resource- or quantity-loaded programme.
+
+## Public deployment
+
+CashflowPot is split into three public surfaces:
+
+```text
+cashflowpot.com/      static public website generated from site/
+cashflowpot.com/app/  Flutter application from iqmia/cashflowpot
+cashflowpot.com/api/  this Flask application mounted by Passenger
+```
+
+Passenger mounts the Flask app at `/api`, while Flask routes remain rooted internally at `/`. For example, the internal health route `/health` is deployed as:
+
+```text
+GET https://cashflowpot.com/api/health
+```
+
+The internal repository and Python package remain named `q_flow`.
+
+## Public website source
+
+The public website is authored under `site/` with shared Jinja templates and CSS, then generated as static files for deployment. Flask does not render ordinary public pages at request time.
+
+Build the static site with:
+
+```bash
+python site/build_site.py
+```
+
+The default output is `site/dist/`. Generated output is ignored by Git and should not be committed.
+
+Individual public pages are added to the static builder only after their content and layout are reviewed.
 
 ## Project model
 
