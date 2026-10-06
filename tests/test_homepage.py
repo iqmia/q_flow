@@ -48,7 +48,7 @@ class HomepageTest(TestCase):
             output = module.build_site(Path(temp_dir) / 'site-output')
             html = (output / 'index.html').read_text(encoding='utf-8')
 
-        self.assertIn('<title>Construction Cash-Flow Simulation &amp; Forecasting | CashflowPot</title>', html)
+        self.assertIn('<title>Construction Cash-Flow Simulation & Forecasting | CashflowPot</title>', html)
         self.assertIn('<link rel="canonical" href="https://cashflowpot.com/">', html)
         self.assertIn('AI-assisted project setup is in development', html)
         self.assertIn('CashflowPot calculation engine remains responsible for the forecast', html)
