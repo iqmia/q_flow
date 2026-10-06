@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -23,7 +24,7 @@ def _environment() -> Environment:
     )
 
 
-def build_site(output_dir: Path | None = None) -> Path:
+def build_site(output_dir: Optional[Path] = None) -> Path:
     output = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_DIR
 
     if output.exists():
