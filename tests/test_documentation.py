@@ -58,12 +58,12 @@ class DocumentationTest(TestCase):
             "work in excess of billings (wieb)",
             "outflow remains activity-based",
             "forecast, not a guarantee",
+            "do not use `billing deferral`",
         ):
             self.assertIn(required, folded)
         for forbidden in (
             "lightweight by design",
             "does not replace primavera p6",
-            "billing deferral",
             "activity-specific selling value and markup allocation",
         ):
             self.assertNotIn(forbidden, folded)
