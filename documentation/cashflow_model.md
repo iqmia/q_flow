@@ -53,21 +53,30 @@ Examples:
 
 The interest rate is also a **rate per model period**. A monthly model therefore requires a monthly financing rate, not an annual rate entered unchanged.
 
+The scenario execution duration is derived from the active activity work series. The financial horizon may extend beyond that duration because of payment delay, WIEB carry, retention release, subcontract payment timing, and DLP.
+
 ## 3. Direction of the model
 
-The same commercial concepts appear at two different levels and must not be confused.
+CashFlowPot separates the contractor's **main-contract inflow forecast** from the **project-execution outflow forecast**.
 
 ### Cash-flow/project level
 
-Project-level terms describe money between the **client and the contractor**. They primarily determine project **inflow**.
+Project-level terms describe money between the **client and the contractor**. They determine project **inflow** after the scenario first generates a contract-value work curve.
 
-Examples: client advance, client retention, client payment delay, and client WIEB.
+CashFlowPot supports two ways to generate that curve:
+
+1. **Independent contract curve** — the default for new scenarios. Contract value follows its own linear or S-curve over the activity-derived execution duration.
+2. **Activity-linked curve** — the compatibility method. The combined activity cost-work curve is scaled to the total contract value.
+
+Examples of client-side terms applied after the contract-value work curve is generated are client advance, client retention, client payment delay, and client WIEB.
 
 ### Activity level
 
-Activity-level commercial terms describe the subcontracted share of an activity between the **contractor and its subcontractor/supplier**. They primarily determine project **outflow**.
+Activity-level terms describe project execution and, for the subcontracted share, the relationship between the **contractor and its subcontractor/supplier**. They determine project **outflow**.
 
 Examples: subcontract advance, subcontract retention, subcontract payment delay, and subcontract WIEB.
+
+The self-performed/direct share is paid in the same period the activity cost is incurred. WIEB is not applied to that self-performed share.
 
 Future UI text and AI schemas should use the contextual names above even though some backend columns retain shorter legacy names such as `advance`, `retention`, and `duration_for_payment`.
 
@@ -79,13 +88,35 @@ The total client contract value represented by one cash-flow scenario.
 
 Backend field: `Cashflow.contract_value`.
 
+### Inflow forecast method
+
+Backend fields:
+
+- `Cashflow.use_independent_inflow_curve`;
+- `Cashflow.inflow_curve_type`; and
+- `Cashflow.inflow_curve_skew`.
+
+The independent method is used only when:
+
+```text
+use_independent_inflow_curve is True
+and
+inflow_curve_type is not NULL
+```
+
+Otherwise the calculator uses the activity-linked contract-value curve.
+
+`inflow_curve_type` accepts `s_curve` or `linear`. `inflow_curve_skew` uses the same greater-than-`-1` and less-than-`1` convention as the existing `Work` curve. Negative values back-load the S-curve, zero is the balanced reference curve, and positive values front-load it. Skew is retained but has no effect when the curve type is `linear`.
+
+Existing database rows may have these new columns as `NULL`. No data backfill is required: the NULL curve type naturally keeps those rows on the activity-linked calculation. New scenarios default to independent S-curve generation.
+
 ### Estimated activity cost
 
 The contractor's estimated cost of an activity. Activity work curves are cost-loaded from this amount.
 
 Backend field: `Activity.cost`.
 
-The current model does **not** store a separate selling value for each activity. Contract value is allocated across activities proportionally to their estimated cost as described in section 7.
+The model does **not** require or estimate a separate selling value or markup for each activity. In independent inflow mode, activity costs do not allocate contract value at all. In activity-linked mode, contract value is allocated proportionally to the combined activity cost-work profile as described in section 7.
 
 ### Advance payment
 
@@ -127,13 +158,15 @@ Project backend field: `Cashflow.wieb`.
 
 Activity backend field: `Activity.work_in_excess`.
 
-In CashFlowPot, WIEB is the **share of completed work that is not billed in the current billing period and is carried into the next billing period**.
+Actual WIEB is the value of work performed but not yet billed. CashFlowPot stores a **WIEB forecasting assumption as a percentage**: the estimated share of completed work in each period that is not billed in that period and is carried into the next billing period.
 
-This is a simplified forecasting assumption. It should not be confused with every accounting use of underbilling/work-in-excess terminology.
+This represents normal construction situations where all performed work is not immediately billable, for example because work is incomplete, awaiting inspection/approval, affected by an NCR, or otherwise not ready for certification.
 
-If WIEB is 20%, then 80% of the current period's otherwise billable work is billed in that period and 20% is carried into the following billing period.
+If the WIEB assumption is 20%, then 80% of the current period's otherwise billable work is billed in that period and 20% is carried into the following billing period.
 
 WIEB affects **timing**, not the lifetime value of the work. Increasing WIEB generally delays cash receipts/payments and can increase the contractor's temporary funding requirement.
+
+At project level it applies to the client-side contract-value work. At activity level it applies only to the subcontracted share. The self-performed/direct share is paid as incurred and is not delayed by WIEB.
 
 ### Subcontracted share
 
@@ -237,11 +270,13 @@ self_performed_cost_t = W_t * (1 - q)
 subcontracted_work_t  = W_t * q
 ```
 
+The self-performed/direct amount is paid as incurred in the same period as the activity work. It does not use the activity WIEB assumption.
+
 ### Subcontract billing
 
 After applying any no-billing period, WIEB is applied to the subcontracted billable work.
 
-For billable subcontract work `S_t` and WIEB `w`:
+For billable subcontract work `S_t` and WIEB assumption `w`:
 
 ```text
 B_0 = S_0 * (1 - w)
@@ -293,9 +328,9 @@ sum(activity outflow) = activity estimated cost
 
 Advance, retention, WIEB, no-billing period, payment delay, and DLP change **when** the subcontracted portion is paid. They do not change the activity's total estimated cost.
 
-## 7. Project cost-loaded work and contract-value allocation
+## 7. Project work and contract-value curve generation
 
-The project's raw workflow is the sum of all active activity marginal cost flows:
+The project's raw cost-loaded workflow is the sum of all active activity marginal cost flows:
 
 ```text
 project_cost_work_t = sum(activity_work_i,t)
@@ -309,9 +344,41 @@ C = sum(project_cost_work_t)
 
 The API currently returns this cost-loaded series under the legacy key `workflow`.
 
-### Contract-value allocation
+The active activity work series also determines the execution duration:
 
-CashFlowPot currently assumes the same contract-value-to-cost factor across all entered activities.
+```text
+execution_duration = max(length of active activity work series)
+```
+
+Activity start and the current pre-work/no-work period are therefore reflected in the derived duration.
+
+### Independent contract curve — default for new scenarios
+
+When:
+
+```text
+use_independent_inflow_curve is True
+and inflow_curve_type is not NULL
+```
+
+CashFlowPot generates contract-value work independently from the activity cost profile.
+
+The engine uses the existing `Work` curve mathematics with:
+
+```text
+duration = execution_duration
+value    = contract_value
+skew     = inflow_curve_skew
+curve    = inflow_curve_type
+```
+
+For a linear curve, contract value is distributed evenly across the derived execution duration. For an S-curve, the existing skew convention changes the timing shape while the error correction keeps the total value equal to the contract value.
+
+The independent contract-value work curve does **not** attempt to infer individual activity selling prices, markup allocation, or a Schedule of Values. Activities determine execution duration and outflow; the main contract independently determines the expected value-of-work profile used for inflow.
+
+### Activity-linked contract curve — compatibility method
+
+If the independent flag is not `True`, or `inflow_curve_type` is `NULL`, the calculator uses the existing activity-linked method.
 
 For project contract value `V` and total entered activity cost `C`:
 
@@ -333,28 +400,34 @@ sum(contract_value_work) = contract_value
 
 when `C > 0`.
 
-This is a deliberate simplification. The model does not currently know the individual selling value or markup of each activity.
+This method assumes the contract-value work profile follows the combined activity cost-work profile using a common project value factor. It still does not claim to know the individual selling value or markup of each activity.
 
 Example:
 
 ```text
-Contract value             = 100
+Contract value              = 100
 Total entered activity cost = 80
-Value factor               = 100 / 80 = 1.25
+Value factor                = 100 / 80 = 1.25
 ```
 
-An activity cost flow of 10 is therefore treated as 12.5 of contract-value work for client billing purposes.
+An activity-linked project cost flow of 10 is therefore treated as 12.5 of contract-value work for client billing purposes.
 
 Until all expected activities/costs have been entered, `contract_value - total_entered_activity_cost` should not automatically be interpreted as final project profit. It is only the difference between the contract value and the costs currently represented in the model.
 
+### No active activities
+
+If there are no active activities, there is no derived execution duration and the calculator returns an empty forecast in either inflow method.
+
 ## 8. Project inflow
+
+The chosen method in section 7 first produces the contract-value work series. The client-side commercial terms are then applied in exactly the same way regardless of how that series was generated.
 
 Let:
 
 - `E_t` = contract-value work in period t;
 - `a` = client advance fraction;
 - `r` = client retention fraction;
-- `w` = client WIEB fraction;
+- `w` = client WIEB assumption;
 - `p` = payment delay in periods; and
 - `V` = contract value.
 
@@ -375,6 +448,8 @@ B_t = E_t * (1 - w) + E_(t-1) * w
 
 final_carry = E_last * w
 ```
+
+This means a portion of executed contract-value work is intentionally carried into the next billing period rather than treated as immediately billable.
 
 ### Progress receipts
 
@@ -417,12 +492,19 @@ The first portion is added at the end of the progress-payment sequence, includin
 - DLP 1: one period later;
 - DLP N: exactly N periods later.
 
-### Invariant
+### Invariants
 
 For valid parameters and normal floating-point precision:
 
 ```text
 sum(project inflow) = contract value
+```
+
+For the independent method:
+
+```text
+sum(independent contract work) = contract value
+length(independent contract work) = execution_duration
 ```
 
 Advance, retention, WIEB, payment delay, and DLP redistribute the timing of contract receipts; they do not create additional contract value.
@@ -436,6 +518,8 @@ project_outflow_t = sum(activity_outflow_i,t)
 ```
 
 Deleted activities are excluded. The calculator recomputes active activity cash flows rather than trusting old cached activity cash-flow JSON.
+
+Changing the inflow forecast method or independent contract-curve settings does not change activity work or project outflow.
 
 ## 10. Net cash flow and financing
 
@@ -479,7 +563,10 @@ Project/cash-flow inputs require:
 - advance, retention, retention-release fraction, and WIEB: each between 0 and 1;
 - advance + retention: not greater than 1;
 - interest rate: finite and non-negative;
-- DLP and payment delay: non-negative integers.
+- DLP and payment delay: non-negative integers;
+- `use_independent_inflow_curve`: boolean or NULL;
+- `inflow_curve_type`: `s_curve`, `linear`, or NULL; and
+- when independent mode is active, `inflow_curve_skew`: finite and strictly greater than -1 and less than 1.
 
 Activity inputs require:
 
@@ -506,8 +593,13 @@ Defaults are starting assumptions, not universal construction rules.
 | DLP | 12 periods |
 | Client payment delay | 1 period |
 | Financing rate | 0.5% per period |
-| Client WIEB | 20% |
+| Client WIEB assumption | 20% |
 | Contract value | 0 |
+| Use independent inflow curve | `true` |
+| Inflow curve type | `s_curve` |
+| Inflow curve skew | `0.0` |
+
+These are model defaults for newly created scenarios. Existing database rows created before the independent-inflow columns were added may contain NULL in the three inflow-curve fields; the calculator then falls back to the activity-linked method without any data backfill.
 
 Activity-type presets may supply different activity assumptions in the client. Those presets are heuristics intended to speed up modelling, not statements that all projects or trades use those conditions.
 
@@ -534,13 +626,16 @@ Preferred terms include:
 | `Cashflow.advance` | Client advance payment |
 | `Cashflow.retention` | Client retention |
 | `Cashflow.duration_for_payment` | Client payment delay |
-| `Cashflow.wieb` | Client billing deferral / WIEB |
+| `Cashflow.wieb` | Client WIEB assumption (%) |
+| `Cashflow.use_independent_inflow_curve` | Inflow forecast method |
+| `Cashflow.inflow_curve_type` | Contract value curve type |
+| `Cashflow.inflow_curve_skew` | Contract value curve skew |
 | `Activity.cost` | Estimated activity cost |
 | `Activity.subcontracted` | Subcontracted share |
 | `Activity.advance` | Subcontract advance |
 | `Activity.retention` | Subcontract retention |
 | `Activity.duration_for_payment` | Subcontract payment delay |
-| `Activity.work_in_excess` | Subcontract billing deferral / WIEB |
+| `Activity.work_in_excess` | Subcontract WIEB assumption (%) |
 | `Activity.mobilization_period` | Pre-work / no-work period |
 | API `workflow` | Cost-loaded work / planned cost flow |
 | API `netflow` | Net cash flow |
@@ -564,7 +659,8 @@ CashFlowPot does not currently calculate:
 - labour, plant, material, or equipment quantities;
 - detailed BOQ measurement or earned-value measurement;
 - tax, currency, escalation, bonds, or other commercial mechanisms unless represented indirectly in the entered cost/value assumptions;
-- individual activity selling values or activity-specific markup; or
+- individual activity selling values or activity-specific markup;
+- a detailed Schedule of Values; or
 - accounting statements.
 
 Those may influence the assumptions entered into CashFlowPot, but they are outside this calculation model.
@@ -576,11 +672,14 @@ Changes to the calculation engine should preserve or deliberately revise the fol
 1. Corrected marginal work sums to the activity estimated cost.
 2. Total activity outflow sums to the activity estimated cost.
 3. Total project inflow sums to the contract value for valid terms.
-4. WIEB shifts timing only and applies from the first billing period.
-5. A payment delay of N shifts progress cash exactly N periods, independent of advance payment.
-6. DLP 0 releases remaining retention in the same end period; DLP N releases it exactly N periods later.
-7. Advance + retention cannot exceed 100% at either project or activity/subcontract level.
-8. Deleted activities do not contribute to project work or outflow.
-9. Positive skew front-loads the current sigmoid work curve relative to the balanced curve; negative skew back-loads it.
+4. Independent contract work sums to the contract value and has the same period count as the derived execution duration.
+5. The independent method is selected only when `use_independent_inflow_curve is True` and `inflow_curve_type` is not NULL; otherwise activity-linked calculation is used.
+6. Changing the inflow method does not change activity work or outflow.
+7. WIEB shifts timing only and applies from the first billing period.
+8. A payment delay of N shifts progress cash exactly N periods, independent of advance payment.
+9. DLP 0 releases remaining retention in the same end period; DLP N releases it exactly N periods later.
+10. Advance + retention cannot exceed 100% at either project or activity/subcontract level.
+11. Deleted activities do not contribute to project work or outflow.
+12. Positive skew front-loads the current sigmoid/S-curve relative to the balanced curve; negative skew back-loads it.
 
 If a future model intentionally changes one of these rules, update the tests and this document together.
