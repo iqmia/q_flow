@@ -33,6 +33,9 @@ _CASHFLOW_IMPORT_FIELDS = {
     "interest_rate",
     "contract_value",
     "wieb",
+    "use_independent_inflow_curve",
+    "inflow_curve_type",
+    "inflow_curve_skew",
 }
 _ACTIVITY_IMPORT_FIELDS = {
     "name",
@@ -111,6 +114,25 @@ def _validate_cashflow(cashflow):
             and not isinstance(value, bool)
             and value >= 0,
             f"Cashflow {field} must be a non-negative integer",
+        )
+
+    independent = getattr(cashflow, "use_independent_inflow_curve", None)
+    InvalidData.require_condition(
+        independent is None or isinstance(independent, bool),
+        "Cashflow use_independent_inflow_curve must be boolean or null",
+    )
+
+    curve_type = getattr(cashflow, "inflow_curve_type", None)
+    InvalidData.require_condition(
+        curve_type is None or curve_type in {"s_curve", "linear"},
+        "Cashflow inflow_curve_type must be s_curve, linear, or null",
+    )
+
+    if independent is True and curve_type is not None:
+        skew = getattr(cashflow, "inflow_curve_skew", None)
+        InvalidData.require_condition(
+            _finite_number(skew) and -1 < skew < 1,
+            "Cashflow inflow_curve_skew must be finite and between -1 and 1",
         )
 
 
