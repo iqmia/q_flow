@@ -194,6 +194,20 @@ Approved positioning themes include:
 
 Do not position CashflowPot as a lesser or simplified replacement for planning, ERP, accounting, or cost-control products.
 
+### Public metadata and social sharing
+
+Search metadata, structured data, and social-sharing copy must match the visible current product positioning. Do not create a hidden machine-only product claim that contradicts what a human reader sees on the page.
+
+All public pages currently use the shared social image:
+
+```text
+https://cashflowpot.com/assets/images/cashflowpot-og.webp
+```
+
+Open Graph and Twitter descriptions should use the same clear construction cash-flow language as the visible page. The Flutter `/app/` shell is shareable but intentionally non-indexable; it remains crawlable so its `noindex, follow` directive can be read. `/api/` is not a discovery surface.
+
+`llms.txt` is a supplementary machine-readable content map, not a substitute for visible explanatory content, canonical URLs, the sitemap, or normal indexing controls.
+
 ## 13. AI-assisted setup boundary
 
 AI-assisted setup is a future input-assistance workflow, not a replacement calculation engine.
