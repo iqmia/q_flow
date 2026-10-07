@@ -45,6 +45,9 @@ A representative production web-root layout is:
 ~/www.cashflowpot.com/
     index.html
     404.html
+    robots.txt
+    sitemap.xml
+    llms.txt
     assets/
     how-it-works/
     methodology/
@@ -97,11 +100,14 @@ The build directory is intentionally deleted and recreated on each build. The pr
 
 ### Site-owned production entries
 
-The publisher manages only the entries derived from the current public page list plus `assets`, currently including:
+The publisher manages only the entries derived from the current public page registry plus public assets and generated discovery files, currently including:
 
 ```text
 index.html
 404.html
+robots.txt
+sitemap.xml
+llms.txt
 assets/
 how-it-works/
 methodology/
@@ -121,6 +127,16 @@ api/
 ```
 
 This preservation is a deployment invariant. Do not change the builder to delete the entire production web root.
+
+### Search and AI discovery files
+
+`build_site.py` generates three root-level discovery files from the current public-site configuration:
+
+- `robots.txt` — allows public crawling, disallows `/api/`, keeps `/app/` crawlable, explicitly permits `OAI-SearchBot`, and references the sitemap;
+- `sitemap.xml` — contains only canonical indexable public pages and excludes `/app/`, `/api/`, assets, and `404.html`;
+- `llms.txt` — provides a concise supplementary map of CashflowPot, its canonical explanatory pages, the application surface, and its relationship to Quollnet.
+
+The Flutter application at `/app/` is intentionally **crawlable but non-indexable**. Its own HTML shell supplies `noindex, follow`, so `robots.txt` must not block crawlers from fetching `/app/`. The Passenger API at `/api/` is not a discovery surface and is disallowed in `robots.txt`.
 
 ## 5. Production public-site deployment
 
@@ -217,7 +233,7 @@ https://cashflowpot.com/app/
 
 `site/build_site.py` does not build, delete, or publish the Flutter app.
 
-The `/app/` directory must therefore be preserved when updating the public site.
+The `/app/` directory must therefore be preserved when updating the public site. The app shell is intentionally shareable while remaining non-indexable through its `noindex, follow` metadata.
 
 When Flutter assets change, rebuild/deploy the Flutter application using its own repository workflow.
 
@@ -268,12 +284,16 @@ https://cashflowpot.com/
 https://cashflowpot.com/how-it-works/
 https://cashflowpot.com/methodology/
 https://cashflowpot.com/contact/
+https://cashflowpot.com/robots.txt
+https://cashflowpot.com/sitemap.xml
+https://cashflowpot.com/llms.txt
 https://cashflowpot.com/assets/manifest.json
+https://cashflowpot.com/assets/images/cashflowpot-og.webp
 https://cashflowpot.com/app/
 https://cashflowpot.com/api/health
 ```
 
-Also confirm that shared `/app/icons/...` images and `/app/favicon.png` resolve on public pages that use them.
+Also confirm that shared `/app/icons/...` images and `/app/favicon.png` resolve on public pages that use them, and that `/app/` still exposes `noindex, follow` rather than being blocked by the public robots file.
 
 After backend changes, run the backend test suite before deployment where practical:
 
@@ -298,6 +318,7 @@ python -m unittest tests.test_site_build tests.test_public_manifest -v
 6. Passenger owns the public `/api` prefix; Flask route definitions stay internally unprefixed.
 7. The public website may reuse `/app/icons/...` and `/app/favicon.png` because `/app/` and the static site share the production domain.
 8. Keep one physical icon set under `/app/`, but separate public-site and Flutter manifests because their start URLs and scopes differ.
-9. Server secrets and persistent data are not source-controlled deployment artifacts.
+9. `robots.txt`, `sitemap.xml`, and `llms.txt` are generated site-owned root files; `/app/` stays crawlable/non-indexable and `/api/` stays outside discovery.
+10. Server secrets and persistent data are not source-controlled deployment artifacts.
 
 Last reviewed: 7 October 2026.
