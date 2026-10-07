@@ -16,6 +16,7 @@ SOCIAL_IMAGE_URL = f'{SITE_ORIGIN}/assets/images/cashflowpot-og.webp'
 ORGANIZATION_ID = f'{SITE_ORIGIN}/#organization'
 WEBSITE_ID = f'{SITE_ORIGIN}/#website'
 SOFTWARE_ID = f'{SITE_ORIGIN}/#software'
+ROOT_DISCOVERY_FILES = ('robots.txt', 'sitemap.xml', 'llms.txt')
 QUOLLNET_SOCIAL_URLS = (
     'https://www.facebook.com/people/Quollnet/100086014988886/',
     'https://www.instagram.com/quollnet/',
@@ -171,6 +172,52 @@ def _structured_data_for(page: PublicPage) -> Optional[Dict[str, Any]]:
     }
 
 
+def _render_robots_txt() -> str:
+    return (
+        'User-agent: *\n'
+        'Allow: /\n'
+        'Disallow: /api/\n'
+        '\n'
+        'User-agent: OAI-SearchBot\n'
+        'Allow: /\n'
+        'Disallow: /api/\n'
+        '\n'
+        f'Sitemap: {SITE_ORIGIN}/sitemap.xml\n'
+    )
+
+
+def _render_sitemap_xml() -> str:
+    namespace = 'http://www.sitemaps.org/schemas/sitemap/0.9'
+    urls = ''.join(
+        f'<url><loc>{page.canonical_url}</loc></url>'
+        for page in PAGES
+        if page.indexable
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<urlset xmlns="{namespace}">{urls}</urlset>\n'
+    )
+
+
+def _render_llms_txt() -> str:
+    return (
+        '# CashflowPot\n\n'
+        'CashflowPot is a construction cash-flow simulation and forecasting product for '
+        'project, commercial and finance decisions. It turns execution timing, contract '
+        'terms and forecasting assumptions into expected inflow, outflow, cash position '
+        'and working-capital/funding exposure.\n\n'
+        '## Canonical public pages\n'
+        f'- Home: {SITE_ORIGIN}/\n'
+        f'- How it works: {SITE_ORIGIN}/how-it-works/\n'
+        f'- Methodology: {SITE_ORIGIN}/methodology/\n'
+        f'- About: {SITE_ORIGIN}/about/\n\n'
+        '## Application and publisher\n'
+        f'- Application: {SITE_ORIGIN}/app/\n'
+        '- CashflowPot is part of the Quollnet ecosystem for engineering and construction.\n'
+        '- Quollnet listing: https://quollnet.com/apps/cashflowpot\n'
+    )
+
+
 def _environment() -> Environment:
     return Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -197,11 +244,15 @@ def build_site(output_dir: Optional[Path] = None) -> Path:
             ),
             encoding='utf-8',
         )
+
+    (output / 'robots.txt').write_text(_render_robots_txt(), encoding='utf-8')
+    (output / 'sitemap.xml').write_text(_render_sitemap_xml(), encoding='utf-8')
+    (output / 'llms.txt').write_text(_render_llms_txt(), encoding='utf-8')
     return output
 
 
 def _managed_publish_entries() -> tuple[str, ...]:
-    entries = {'assets'}
+    entries = {'assets', *ROOT_DISCOVERY_FILES}
     entries.update(Path(page.destination).parts[0] for page in PAGES)
     return tuple(sorted(entries))
 
