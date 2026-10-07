@@ -81,7 +81,87 @@ CashflowPot already supports multiple independent scenarios per project. A futur
 
 This should build on the existing scenario model rather than create a separate parallel forecast structure.
 
-## 5. Not an assumed roadmap item
+## 5. Project financing facilities
+
+### Goal
+
+Add a financing layer that helps contractors assess whether a project can be funded, what facilities may be required, and whether those facilities are available in the periods when the project needs them.
+
+Typical uses include bid/no-bid review, bank-facility planning, facility-adequacy checks, and financing scenario comparison.
+
+### Core principle
+
+Keep the model cash-flow-native. CashflowPot does not need supplier, purchase-order, or procurement relationships to model financing.
+
+A facility draw is added to project inflow. Principal repayments, fees, and interest are added to project outflow. The model should preserve the project cash position before financing as well as the funded cash position after financing so financing does not hide the underlying project funding requirement.
+
+A future facility should have common terms such as:
+
+- facility type/name;
+- availability start and end;
+- limit;
+- fees;
+- interest/cost; and
+- outstanding principal/capacity.
+
+For a limited facility, available capacity is based on the facility limit less outstanding principal, where outstanding principal is principal drawn minus principal repaid.
+
+### Composable draw and repayment rules
+
+The main design direction is to treat a financing product as a combination of a **draw method** and a **repayment method**, rather than building a separate calculation model for every named banking product.
+
+Possible draw methods include:
+
+- **Automatic cash-shortfall draw** — draw when the pre-financing cash balance would otherwise be negative, subject to available capacity. This fits overdraft-style funding and can also represent contractor funding used to close residual gaps.
+- **Scheduled draw** — the user specifies the project period and amount. This can represent funded LCs, equipment finance, contract-specific working-capital loans, or other planned facilities without requiring CashflowPot to know what the financing paid for.
+- **PPC-linked draw** — draw is triggered by an eligible PPC/certification amount, for products such as PPC discounting. The exact eligible series and timing rules need to be defined before implementation.
+
+Possible repayment methods include:
+
+- **Cashflow sweep** — use available positive project cash to repay outstanding principal;
+- **Percentage of PPC** — repay an agreed percentage of eligible PPC receipts;
+- **Equal installments** — repay equal amounts at a selected interval; and
+- **Scheduled repayments** — user-defined repayment amounts by project period.
+
+These methods should be combinable. For example, a user could schedule an LC draw in period 5 and configure its repayment as 20% of each PPC starting from period 10.
+
+### Initial facility examples
+
+- **Overdraft:** automatic cash-shortfall draw, facility limit, fees/interest, normally repaid by cashflow sweep.
+- **Contractor funding:** may use the same automatic draw mechanics as an overdraft, with its own optional limit and funding cost.
+- **PPC discounting:** PPC-linked draw with an advance percentage and facility limit; later receipts repay the outstanding advance according to the agreed terms.
+- **Funded LC:** scheduled draw, with repayment selected independently from the draw schedule.
+- **Equipment finance:** scheduled draw with installment, scheduled, or other agreed repayment terms.
+- **Contract-specific working-capital finance:** planned/scheduled draw with sweep, installment, PPC-linked, or scheduled repayment.
+
+A guarantee-only LC does not create a project cash movement and therefore does not need to be included in this cash-flow feature unless CashflowPot later adds a separate non-cash facility-capacity model.
+
+### Intended outputs
+
+The financing layer should eventually show at least:
+
+- project cash position before financing;
+- facility draws and repayments;
+- funded cash position;
+- peak underlying funding need and when it occurs;
+- utilization and remaining capacity by facility;
+- total financing cost; and
+- any remaining unfunded shortfall.
+
+Facility adequacy should be judged by **amount, timing, availability, and outstanding capacity**, not simply by adding nominal facility limits.
+
+### Details to settle before implementation
+
+The following remain intentionally open for later design:
+
+- priority when multiple automatic facilities can fund the same shortfall;
+- exact PPC-linked draw and repayment mechanics;
+- interest and fee calculation conventions by facility;
+- repayment ordering when several facilities are outstanding;
+- contractor-funding repayment behavior; and
+- interaction between financing repayments and available positive cash.
+
+## 6. Not an assumed roadmap item
 
 The following is **not** an approved default future direction:
 
@@ -91,7 +171,7 @@ The following is **not** an approved default future direction:
 
 The current Independent contract curve deliberately separates main-contract value timing from activity cost allocation. Do not reintroduce an old “activity-specific selling value and markup allocation” roadmap statement without a new product decision.
 
-## 6. How ideas graduate from future to current
+## 7. How ideas graduate from future to current
 
 When a future item is implemented:
 
