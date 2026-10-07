@@ -108,3 +108,21 @@ class DocumentationTest(TestCase):
             "PassengerBaseURI \"/api\"",
         ):
             self.assertIn(required, text)
+
+    def test_search_discovery_architecture_is_documented(self):
+        deployment = (DOCS / "deployment.md").read_text(encoding="utf-8")
+        technical = (DOCS / "technical.md").read_text(encoding="utf-8")
+        combined = deployment + "\n" + technical
+        for required in (
+            "robots.txt",
+            "sitemap.xml",
+            "llms.txt",
+            "cashflowpot-og.webp",
+            "noindex, follow",
+            "crawlable",
+            "/api/",
+            "PublicPage",
+            "JSON-LD",
+        ):
+            self.assertIn(required, combined)
+        self.assertIn("not a discovery surface", technical)
