@@ -6,6 +6,7 @@ from unittest import TestCase
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = REPO_ROOT / 'site' / 'build_site.py'
+SITE_CSS = REPO_ROOT / 'site' / 'static' / 'css' / 'site.css'
 
 
 def _load_builder():
@@ -34,3 +35,10 @@ class HomepageHeroTest(TestCase):
             ):
                 html = (output / relative_path).read_text(encoding='utf-8')
                 self.assertNotIn('home-hero.webp', html)
+
+    def test_homepage_hero_has_explicit_responsive_image_style(self):
+        css = SITE_CSS.read_text(encoding='utf-8')
+        self.assertIn('.hero__image', css)
+        self.assertIn('width: 100%', css)
+        self.assertIn('aspect-ratio: 16 / 9', css)
+        self.assertIn('object-fit: cover', css)
