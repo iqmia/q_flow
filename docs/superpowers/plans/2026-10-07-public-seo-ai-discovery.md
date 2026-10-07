@@ -6,7 +6,7 @@
 
 **Architecture:** Evolve `site/build_site.py` into the source of truth for public-page identity and discovery output. Render page metadata and JSON-LD from one `PublicPage` registry into the shared Jinja shell, generate `robots.txt`, `sitemap.xml`, and `llms.txt` at the build root, and keep publishing limited to site-owned paths. The Flutter `/app/` shell is handled in the companion plan `2026-10-07-flutter-app-web-metadata.md`.
 
-**Tech Stack:** Python 3, Jinja2, static HTML/CSS, `unittest`/pytest-compatible tests.
+**Tech Stack:** Python 3.9, Jinja2, static HTML/CSS, `unittest`/pytest-compatible tests.
 
 **Spec:** `docs/superpowers/specs/2026-10-07-seo-ai-discovery-design.md`
 
@@ -24,6 +24,7 @@
 - Do not add pricing/Offer structured data in this pass.
 - Preserve one physical icon set under `/app/icons/...` and the existing public manifest at `/assets/manifest.json`.
 - `site/build_site.py` must never delete the full production web root; `/app/`, `/api/`, and unrelated entries remain untouched.
+- Keep implementation syntax compatible with production Python 3.9; use `Optional[...]` rather than PEP 604 `X | None` annotations.
 
 ## Review Focus
 
@@ -48,7 +49,7 @@
 - Produces dataclass `PublicPage(template_name: str, destination: str, canonical_path: str, title: str, description: str, schema_type: str = "WebPage", indexable: bool = True)`.
 - Produces `PublicPage.canonical_url -> str`, formed from `SITE_ORIGIN = "https://cashflowpot.com"` plus `canonical_path`.
 - Produces `PAGES: tuple[PublicPage, ...]` as the authoritative public-page registry.
-- `build_site()` renders each template with `page=<PublicPage>` and later `structured_data=<dict | None>` from Task 2.
+- `build_site()` renders each template with `page=<PublicPage>` and later `structured_data=<Optional[dict[str, object]]>` from Task 2.
 
 - [ ] **Step 1: Write failing metadata-registry tests**
 
@@ -102,7 +103,7 @@ git commit -m "feat: add shared public SEO metadata"
 
 **Interfaces:**
 - Consumes: `PublicPage` and `SITE_ORIGIN` from Task 1.
-- Produces: `_structured_data_for(page: PublicPage) -> dict[str, object] | None`.
+- Produces: `_structured_data_for(page: PublicPage) -> Optional[dict[str, object]]`.
 - `build_site()` passes that dictionary as `structured_data`; `base.html` emits it using Jinja `tojson`, not manually concatenated JSON.
 
 - [ ] **Step 1: Write failing JSON-LD tests**
