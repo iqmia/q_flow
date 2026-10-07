@@ -148,3 +148,65 @@ class StructuredDataTest(TestCase):
                 self.assertEqual([item['position'] for item in breadcrumb['itemListElement']], [1, 2])
                 self.assertEqual(breadcrumb['itemListElement'][0]['item'], 'https://cashflowpot.com/')
                 self.assertEqual(breadcrumb['itemListElement'][1]['item'], url)
+
+
+class DiscoveryFilesTest(TestCase):
+    def test_build_generates_robots_sitemap_and_llms_from_public_registry(self):
+        import xml.etree.ElementTree as ET
+
+        module = _load_builder()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = module.build_site(Path(temp_dir) / 'site-output')
+            robots = (output / 'robots.txt').read_text(encoding='utf-8')
+            sitemap = (output / 'sitemap.xml').read_text(encoding='utf-8')
+            llms = (output / 'llms.txt').read_text(encoding='utf-8')
+
+        self.assertIn('User-agent: *', robots)
+        self.assertIn('Allow: /', robots)
+        self.assertIn('Disallow: /api/', robots)
+        self.assertNotIn('Disallow: /app/', robots)
+        self.assertIn('User-agent: OAI-SearchBot', robots)
+        self.assertIn('Sitemap: https://cashflowpot.com/sitemap.xml', robots)
+
+        root = ET.fromstring(sitemap)
+        namespace = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+        urls = {node.text for node in root.findall('s:url/s:loc', namespace)}
+        self.assertEqual(urls, {values[2] for values in EXPECTED.values()})
+        self.assertNotIn('<lastmod>', sitemap)
+        for forbidden in ('/app/', '/api/', '404', '/assets/'):
+            self.assertNotIn(forbidden, sitemap)
+
+        folded = llms.casefold()
+        self.assertIn('construction cash-flow simulation and forecasting', folded)
+        for url in (
+            'https://cashflowpot.com/',
+            'https://cashflowpot.com/how-it-works/',
+            'https://cashflowpot.com/methodology/',
+            'https://cashflowpot.com/about/',
+            'https://cashflowpot.com/app/',
+            'https://quollnet.com/apps/cashflowpot',
+        ):
+            self.assertIn(url, llms)
+
+    def test_publish_manages_discovery_files_without_touching_app_api_or_unrelated_files(self):
+        module = _load_builder()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            build = module.build_site(root / 'dist')
+            web_root = root / 'www.cashflowpot.com'
+            web_root.mkdir()
+            for protected in ('app', 'api'):
+                directory = web_root / protected
+                directory.mkdir()
+                (directory / 'keep.txt').write_text('keep', encoding='utf-8')
+            (web_root / 'unrelated.txt').write_text('keep', encoding='utf-8')
+            for name in ('robots.txt', 'sitemap.xml', 'llms.txt'):
+                (web_root / name).write_text('stale', encoding='utf-8')
+
+            module.publish_site(build, web_root)
+
+            for name in ('robots.txt', 'sitemap.xml', 'llms.txt'):
+                self.assertNotEqual((web_root / name).read_text(encoding='utf-8'), 'stale')
+            self.assertEqual((web_root / 'app' / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+            self.assertEqual((web_root / 'api' / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+            self.assertEqual((web_root / 'unrelated.txt').read_text(encoding='utf-8'), 'keep')
