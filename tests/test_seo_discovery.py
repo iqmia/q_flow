@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import re
 import html as html_lib
 import tempfile
 from pathlib import Path
@@ -86,3 +88,63 @@ class SeoMetadataTest(TestCase):
         self.assertIn('<meta name="robots" content="noindex">', html)
         self.assertNotIn('rel="canonical"', html)
         self.assertNotIn('application/ld+json', html)
+
+
+def _json_ld(html: str):
+    match = re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    if match is None:
+        raise AssertionError('JSON-LD script not found')
+    return json.loads(match.group(1))
+
+
+class StructuredDataTest(TestCase):
+    def test_homepage_json_ld_describes_company_site_and_current_software(self):
+        module = _load_builder()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = module.build_site(Path(temp_dir) / 'site-output')
+            data = _json_ld((output / 'index.html').read_text(encoding='utf-8'))
+
+        self.assertEqual(data['@context'], 'https://schema.org')
+        by_id = {item['@id']: item for item in data['@graph']}
+        organization = by_id['https://cashflowpot.com/#organization']
+        website = by_id['https://cashflowpot.com/#website']
+        software = by_id['https://cashflowpot.com/#software']
+        self.assertEqual(organization['@type'], 'Organization')
+        self.assertEqual(organization['name'], 'Quollnet')
+        self.assertEqual(organization['legalName'], 'Quoll Unipessoal LDA')
+        self.assertEqual(organization['url'], 'https://www.quollnet.com')
+        self.assertIn('https://www.linkedin.com/in/quollnet/', organization['sameAs'])
+        self.assertEqual(website['@type'], 'WebSite')
+        self.assertEqual(website['url'], 'https://cashflowpot.com/')
+        self.assertEqual(website['publisher']['@id'], organization['@id'])
+        self.assertEqual(software['@type'], 'SoftwareApplication')
+        self.assertEqual(software['url'], 'https://cashflowpot.com/app/')
+        self.assertEqual(software['applicationCategory'], 'BusinessApplication')
+        self.assertEqual(software['operatingSystem'], 'Web')
+        features = ' '.join(software['featureList']).casefold()
+        for term in ('scenario forecasting', 'activity-based outflow', 'independent contract curve', 'activity-linked inflow', 'working capital', 'excel export'):
+            self.assertIn(term, features)
+        self.assertNotIn('offers', {key.casefold() for key in software})
+
+    def test_internal_page_json_ld_uses_page_type_canonical_and_breadcrumb(self):
+        module = _load_builder()
+        cases = {
+            'how-it-works/index.html': ('WebPage', 'https://cashflowpot.com/how-it-works/'),
+            'methodology/index.html': ('WebPage', 'https://cashflowpot.com/methodology/'),
+            'about/index.html': ('AboutPage', 'https://cashflowpot.com/about/'),
+            'contact/index.html': ('ContactPage', 'https://cashflowpot.com/contact/'),
+            'privacy/index.html': ('WebPage', 'https://cashflowpot.com/privacy/'),
+            'terms/index.html': ('WebPage', 'https://cashflowpot.com/terms/'),
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = module.build_site(Path(temp_dir) / 'site-output')
+            for relative_path, (page_type, url) in cases.items():
+                data = _json_ld((output / relative_path).read_text(encoding='utf-8'))
+                page = next(item for item in data['@graph'] if item['@type'] == page_type)
+                breadcrumb = next(item for item in data['@graph'] if item['@type'] == 'BreadcrumbList')
+                self.assertEqual(page['url'], url)
+                self.assertEqual(page['isPartOf']['@id'], 'https://cashflowpot.com/#website')
+                self.assertEqual(page['breadcrumb']['@id'], f'{url}#breadcrumb')
+                self.assertEqual([item['position'] for item in breadcrumb['itemListElement']], [1, 2])
+                self.assertEqual(breadcrumb['itemListElement'][0]['item'], 'https://cashflowpot.com/')
+                self.assertEqual(breadcrumb['itemListElement'][1]['item'], url)

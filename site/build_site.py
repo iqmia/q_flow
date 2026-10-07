@@ -2,7 +2,7 @@ import argparse
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -13,6 +13,16 @@ DEFAULT_OUTPUT_DIR = SITE_DIR / 'dist'
 DEFAULT_WEB_ROOT = Path.home() / 'www.cashflowpot.com'
 SITE_ORIGIN = 'https://cashflowpot.com'
 SOCIAL_IMAGE_URL = f'{SITE_ORIGIN}/assets/images/cashflowpot-og.webp'
+ORGANIZATION_ID = f'{SITE_ORIGIN}/#organization'
+WEBSITE_ID = f'{SITE_ORIGIN}/#website'
+SOFTWARE_ID = f'{SITE_ORIGIN}/#software'
+QUOLLNET_SOCIAL_URLS = (
+    'https://www.facebook.com/people/Quollnet/100086014988886/',
+    'https://www.instagram.com/quollnet/',
+    'https://twitter.com/quollnet',
+    'https://www.linkedin.com/in/quollnet/',
+    'https://www.youtube.com/@quollnet',
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +87,90 @@ PAGES: tuple[PublicPage, ...] = (
 )
 
 
+def _structured_data_for(page: PublicPage) -> Optional[Dict[str, Any]]:
+    if not page.indexable:
+        return None
+
+    if page.canonical_path == '/':
+        return {
+            '@context': 'https://schema.org',
+            '@graph': [
+                {
+                    '@type': 'Organization',
+                    '@id': ORGANIZATION_ID,
+                    'name': 'Quollnet',
+                    'legalName': 'Quoll Unipessoal LDA',
+                    'url': 'https://www.quollnet.com',
+                    'sameAs': list(QUOLLNET_SOCIAL_URLS),
+                },
+                {
+                    '@type': 'WebSite',
+                    '@id': WEBSITE_ID,
+                    'name': 'CashflowPot',
+                    'url': f'{SITE_ORIGIN}/',
+                    'publisher': {'@id': ORGANIZATION_ID},
+                },
+                {
+                    '@type': 'SoftwareApplication',
+                    '@id': SOFTWARE_ID,
+                    'name': 'CashflowPot',
+                    'url': f'{SITE_ORIGIN}/app/',
+                    'applicationCategory': 'BusinessApplication',
+                    'operatingSystem': 'Web',
+                    'description': (
+                        'Construction cash-flow simulation and forecasting for '
+                        'project, commercial and finance decisions.'
+                    ),
+                    'featureList': [
+                        'Scenario forecasting',
+                        'Activity-based outflow forecasting',
+                        'Independent contract curve inflow',
+                        'Activity-linked inflow',
+                        'Cash position and working capital analysis',
+                        'Excel export',
+                    ],
+                    'publisher': {'@id': ORGANIZATION_ID},
+                    'isPartOf': {'@id': WEBSITE_ID},
+                },
+            ],
+        }
+
+    breadcrumb_id = f'{page.canonical_url}#breadcrumb'
+    return {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': page.schema_type,
+                '@id': f'{page.canonical_url}#webpage',
+                'url': page.canonical_url,
+                'name': page.title,
+                'description': page.description,
+                'isPartOf': {'@id': WEBSITE_ID},
+                'publisher': {'@id': ORGANIZATION_ID},
+                'breadcrumb': {'@id': breadcrumb_id},
+            },
+            {
+                '@type': 'BreadcrumbList',
+                '@id': breadcrumb_id,
+                'itemListElement': [
+                    {
+                        '@type': 'ListItem',
+                        'position': 1,
+                        'name': 'CashflowPot',
+                        'item': f'{SITE_ORIGIN}/',
+                    },
+                    {
+                        '@type': 'ListItem',
+                        'position': 2,
+                        'name': page.title,
+                        'item': page.canonical_url,
+                    },
+                ],
+            },
+        ],
+    }
+
+
 def _environment() -> Environment:
     return Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
@@ -99,6 +193,7 @@ def build_site(output_dir: Optional[Path] = None) -> Path:
             environment.get_template(page.template_name).render(
                 page=page,
                 social_image_url=SOCIAL_IMAGE_URL,
+                structured_data=_structured_data_for(page),
             ),
             encoding='utf-8',
         )
