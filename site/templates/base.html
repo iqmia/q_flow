@@ -5,13 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#E89A5B">
-  <title>{% block title %}CashflowPot{% endblock %}</title>
-  <meta name="description" content="{% block description %}{% endblock %}">
+  <title>{% block title %}{{ page.title }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ page.description }}{% endblock %}">
+  {% if page.indexable %}
+  <meta name="robots" content="index, follow">
+  {% block canonical_url %}<link rel="canonical" href="{{ page.canonical_url }}">{% endblock %}
+  <meta property="og:site_name" content="CashflowPot">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page.title }}">
+  <meta property="og:description" content="{{ page.description }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ social_image_url }}">
+  <meta property="og:image:type" content="image/webp">
+  <meta property="og:image:alt" content="CashflowPot construction cash-flow forecasting">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page.title }}">
+  <meta name="twitter:description" content="{{ page.description }}">
+  <meta name="twitter:image" content="{{ social_image_url }}">
+  {% else %}
+  <meta name="robots" content="noindex">
+  {% endif %}
   <link rel="icon" type="image/png" href="/app/favicon.png">
   <link rel="apple-touch-icon" href="/app/icons/Icon-192.png">
   <link rel="manifest" href="/assets/manifest.json">
-  {% block canonical_url %}{% endblock %}
-  {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="/assets/css/site.css">
   <link rel="stylesheet" href="/assets/css/content-pages.css">
 </head>
@@ -33,38 +49,14 @@
       </nav>
     </div>
   </header>
-
-  <main id="main-content">
-    {% block content %}{% endblock %}
-  </main>
-
+  <main id="main-content">{% block content %}{% endblock %}</main>
   <footer class="site-footer">
     <div class="site-shell site-footer__inner">
       <div class="site-footer__groups">
-        <nav class="site-footer__group" aria-label="Product links">
-          <strong>Product</strong>
-          <a href="/how-it-works/">How it works</a>
-          <a href="/methodology/">Methodology</a>
-          <a href="/about/">About</a>
-          <a href="/app/">Open app</a>
-        </nav>
-        <nav class="site-footer__group" aria-label="Company and support links">
-          <strong>Company &amp; support</strong>
-          <a href="/contact/">Contact</a>
-          <a href="/privacy/">Privacy</a>
-          <a href="/terms/">Terms</a>
-          <a href="https://quollnet.com/apps/cashflowpot">CashflowPot on Quollnet</a>
-        </nav>
+        <nav class="site-footer__group" aria-label="Product links"><strong>Product</strong><a href="/how-it-works/">How it works</a><a href="/methodology/">Methodology</a><a href="/about/">About</a><a href="/app/">Open app</a></nav>
+        <nav class="site-footer__group" aria-label="Company and support links"><strong>Company &amp; support</strong><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="https://quollnet.com/apps/cashflowpot">CashflowPot on Quollnet</a></nav>
       </div>
-      <div class="site-footer__attribution">
-        <a class="site-footer__quollnet" href="https://quollnet.com/apps/cashflowpot" aria-label="CashflowPot on Quollnet">
-          <img class="site-footer__quollnet-logo" src="/app/icons/quollnet_logo_transp.webp" alt="Quollnet" width="56" height="56">
-        </a>
-        <div>
-          <p>CashflowPot is part of the Quollnet ecosystem for engineering and construction. <a href="https://quollnet.com/apps/cashflowpot">Explore CashflowPot on Quollnet</a>.</p>
-          <p class="site-footer__meta">Construction cash-flow simulation and forecasting by Quollnet.</p>
-        </div>
-      </div>
+      <div class="site-footer__attribution"><a class="site-footer__quollnet" href="https://quollnet.com/apps/cashflowpot" aria-label="CashflowPot on Quollnet"><img class="site-footer__quollnet-logo" src="/app/icons/quollnet_logo_transp.webp" alt="Quollnet" width="56" height="56"></a><div><p>CashflowPot is part of the Quollnet ecosystem for engineering and construction. <a href="https://quollnet.com/apps/cashflowpot">Explore CashflowPot on Quollnet</a>.</p><p class="site-footer__meta">Construction cash-flow simulation and forecasting by Quollnet.</p></div></div>
     </div>
   </footer>
 </body>
