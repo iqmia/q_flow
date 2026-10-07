@@ -63,7 +63,7 @@ class SeoMetadataTest(TestCase):
             output = module.build_site(Path(temp_dir) / 'site-output')
             for relative_path, (title, description, url) in EXPECTED.items():
                 html = (output / relative_path).read_text(encoding='utf-8')
-                self.assertIn(f'<title>{title}</title>', html)
+                self.assertIn(f'<title>{html_lib.escape(title, quote=True)}</title>', html)
                 self.assertIn(f'<meta name="description" content="{html_lib.escape(description, quote=True)}">', html)
                 self.assertIn(f'<link rel="canonical" href="{url}">', html)
                 self.assertIn('<meta name="robots" content="index, follow">', html)
@@ -210,3 +210,15 @@ class DiscoveryFilesTest(TestCase):
             self.assertEqual((web_root / 'app' / 'keep.txt').read_text(encoding='utf-8'), 'keep')
             self.assertEqual((web_root / 'api' / 'keep.txt').read_text(encoding='utf-8'), 'keep')
             self.assertEqual((web_root / 'unrelated.txt').read_text(encoding='utf-8'), 'keep')
+
+
+class PageMetadataSourceTest(TestCase):
+    def test_content_templates_do_not_override_registry_metadata(self):
+        templates = REPO_ROOT / 'site' / 'templates'
+        for name in (
+            'index.html', 'how-it-works.html', 'methodology.html', 'about.html',
+            'contact.html', 'privacy.html', 'terms.html', '404.html',
+        ):
+            source = (templates / name).read_text(encoding='utf-8')
+            for block in ('title', 'description', 'canonical_url', 'head_extra'):
+                self.assertNotIn(f'block {block}', source, f'{name} still overrides {block}')
