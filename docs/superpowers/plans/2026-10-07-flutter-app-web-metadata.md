@@ -22,7 +22,7 @@
 - Social description is `Build and review construction project cash-flow forecasts from execution timing, contract terms and forecasting assumptions.`
 - No JSON-LD is needed in `/app/`; the public homepage owns the canonical software structured-data representation.
 - Keep existing Flutter bootstrap, analytics behavior, loading-progress behavior, favicon/touch icons, and application functionality intact.
-- Flutter manifest keeps `start_url: "."`, `display: "standalone"`, and the existing icon entries.
+- Flutter manifest keeps `start_url: "."`, `display: "standalone"`, `orientation: "portrait-primary"`, `prefer_related_applications: false`, and the existing icon entries.
 - Manifest colors: background `#F7F4EF`, theme `#E89A5B`.
 
 ## Review Focus
@@ -115,7 +115,7 @@ git commit -m "feat: make app shell shareable and noindex"
 
 - [ ] **Step 1: Add failing manifest assertions**
 
-In `web_metadata_test.dart`, parse `web/manifest.json` with `jsonDecode`. Assert the exact values above and assert the icon-source set remains:
+In `web_metadata_test.dart`, parse `web/manifest.json` with `jsonDecode`. Assert the exact values above and assert `orientation == "portrait-primary"` and `prefer_related_applications == false`. Assert the icon-source set remains:
 
 ```text
 icons/Icon-192.png
@@ -136,7 +136,7 @@ Expected: FAIL on current manifest identity/colors/description.
 
 - [ ] **Step 3: Update `web/manifest.json`**
 
-Change only the approved identity/description/color values; retain `start_url`, `display`, `prefer_related_applications`, and all icon definitions. Remove `orientation` only if it is not intentionally required by current app UX; otherwise preserve it—orientation is not part of this SEO change.
+Change only the approved `name`, `short_name`, `description`, `background_color`, and `theme_color` values. Preserve `start_url`, `display`, `orientation`, `prefer_related_applications`, and all existing icon definitions unchanged.
 
 - [ ] **Step 4: Run the focused test**
 
@@ -180,9 +180,13 @@ flutter test
 
 Expected: PASS. If a pre-existing unrelated failure appears, record it explicitly rather than claiming the suite passed.
 
-- [ ] **Step 3: Build the web application using the existing deployment base-href workflow**
+- [ ] **Step 3: Build the web application for its production `/app/` mount**
 
-Use the same command/options already used for production deployment; do not invent a different app path. After build, inspect the generated `build/web/index.html` and `build/web/manifest.json` to confirm the noindex/social metadata and manifest identity survived the Flutter build step.
+```bash
+flutter build web --base-href /app/
+```
+
+After build, inspect `build/web/index.html` and `build/web/manifest.json` to confirm the noindex/social metadata, `$FLUTTER_BASE_HREF` replacement with `/app/`, and current manifest identity survived the Flutter build step.
 
 - [ ] **Step 4: Commit only if verification required a corrective source change**
 
