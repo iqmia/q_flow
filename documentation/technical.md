@@ -196,7 +196,7 @@ site/build_site.py
 
 `build_site.py` renders the reviewed page set into `site/dist/` and, in normal production mode, publishes only the site-owned entries into the production web root.
 
-The builder maintains an authoritative public-page registry containing each page's output destination, canonical path, indexing status, title/description metadata, and schema type. That registry drives sitemap membership and supplies the shared Jinja shell with canonical/search/social metadata.
+The builder maintains an authoritative `PublicPage` registry containing each page's output destination, canonical path, indexing status, title/description metadata, and schema type. That registry drives sitemap membership and supplies the shared Jinja shell with canonical/search/social metadata.
 
 The shared public head provides:
 
