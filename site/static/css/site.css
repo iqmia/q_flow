@@ -273,6 +273,14 @@ p {
   padding: 28px;
 }
 
+.hero__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  align-self: center;
+  object-fit: cover;
+}
+
 .decision-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
