@@ -184,7 +184,7 @@ Project access is then enforced using QAuth Unit context and Unit permissions.
 
 Token refresh and the exact current security flow are documented in [`reference/security.md`](reference/security.md).
 
-## 10. Public website
+## 10. Public website and discovery metadata
 
 The public website source is under:
 
@@ -195,6 +195,18 @@ site/build_site.py
 ```
 
 `build_site.py` renders the reviewed page set into `site/dist/` and, in normal production mode, publishes only the site-owned entries into the production web root.
+
+The builder maintains an authoritative public-page registry containing each page's output destination, canonical path, indexing status, title/description metadata, and schema type. That registry drives sitemap membership and supplies the shared Jinja shell with canonical/search/social metadata.
+
+The shared public head provides:
+
+- canonical URLs and robots directives;
+- Open Graph and Twitter metadata;
+- the shared social image `https://cashflowpot.com/assets/images/cashflowpot-og.webp`;
+- homepage JSON-LD for the Quollnet Organization, CashflowPot WebSite, and current SoftwareApplication;
+- lightweight page-level JSON-LD plus breadcrumb data on internal public pages.
+
+`build_site.py` also generates root `robots.txt`, `sitemap.xml`, and `llms.txt`. The public website is the authoritative indexable discovery surface. The Flutter `/app/` shell remains crawlable but non-indexable so its `noindex, follow` directive can be read, while `/api/` is not a discovery surface and is disallowed through the public robots policy.
 
 The site and Flutter app intentionally share some `/app/icons/...` assets on the production domain. A simple local `site/dist` preview therefore cannot display those app-owned icons unless the Flutter app is also served at `/app/`.
 
