@@ -236,6 +236,17 @@ class FinancingEngineTests(unittest.TestCase):
 
 
 class FinancingValidationTests(unittest.TestCase):
+    def test_unlimited_facilities_may_leave_limit_blank(self):
+        errors = _FINANCING.validate_financing_facilities([{
+            "name": "OD",
+            "type": "Overdraft",
+            "draw_method": "automatic_shortfall",
+            "repayment_method": "cashflow_sweep",
+            "limit": None,
+        }])
+
+        self.assertEqual(errors, [])
+
     def test_rejects_equal_installments_without_a_positive_count(self):
         validate = _FINANCING.validate_financing_facilities
 
