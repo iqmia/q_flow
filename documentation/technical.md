@@ -109,6 +109,7 @@ Important classes are:
 - `Work` — generates linear or S-curve marginal work and corrects the curve to preserve total value;
 - `Activity_cf` — calculates activity work and activity outflow;
 - `CashflowCalculator` — combines active activities, selects the contract-value inflow method, calculates project inflow/outflow/net cash, and applies financing to negative cumulative balances.
+- `calculate_financing` — applies optional facility definitions in period order, returning facility draw, repayment, cost, capacity, funded balance, and shortfall series. The `financing_facilities` JSON column is nullable for existing scenarios; run `flask add-financing-facilities-column` after deploying the code to upgrade an existing database.
 
 `Project_cf` remains as a compatibility alias for `CashflowCalculator`.
 

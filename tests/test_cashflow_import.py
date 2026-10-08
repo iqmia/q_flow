@@ -122,6 +122,38 @@ def test_import_cashflow_preserves_independent_inflow_settings(app):
     assert snapshot["inflow_curve_skew"] == pytest.approx(0.35)
 
 
+def test_import_cashflow_preserves_facility_terms_and_calculated_rows(app):
+    payload = _payload()
+    payload["cashflow"]["financing_facilities"] = [{
+        "id": "od-1",
+        "name": "Project overdraft",
+        "type": "Overdraft",
+        "draw_method": "automatic_shortfall",
+        "repayment_method": "cashflow_sweep",
+        "start": 0,
+        "end": 4,
+        "limit": 100000,
+        "fees": 250,
+        "interest_rate": 0.01,
+        "revolving": True,
+        "sweep_priority": 0,
+    }]
+    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
+        result = app.test_client().post(
+            "/project/unit-1/cashflows/import",
+            headers=_auth(),
+            json=payload,
+        )
+
+    assert result.status_code == 201
+    snapshot = result.get_json()["data"]
+    assert snapshot["financing_facilities"] == payload["cashflow"]["financing_facilities"]
+    assert snapshot["facility_rows"][0]["id"] == "od-1"
+    assert snapshot["facility_fees"]
+
+
 def test_import_cashflow_rejects_invalid_activity_without_partial_rows(app):
     payload = _payload()
     payload["cashflow"]["activities"][0]["cost"] = 0

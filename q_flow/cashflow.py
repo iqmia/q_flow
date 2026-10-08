@@ -240,6 +240,41 @@ class CashflowCalculator():
 
         return inflow
 
+    def ppc_base(self) -> list:
+        """Return client PPC receipts, excluding advance and retention releases."""
+        receipts = self.inflow()
+        if not receipts:
+            return []
+
+        receipts[0] -= self.project.advance * self.project.contract_value
+        retention = self.project.retention * self.project.contract_value
+        if self.project.dlp == 0:
+            receipts[-1] -= retention
+        else:
+            receipts[-1] -= retention * (1 - self.project.release_retention_eop)
+            eop_period = len(receipts) - self.project.dlp - 1
+            if eop_period >= 0:
+                receipts[eop_period] -= retention * self.project.release_retention_eop
+        return [max(0.0, value) for value in receipts]
+
+    def ppc_issued(self) -> list:
+        """Return net PPC values in certificate periods, before payment delay."""
+        work = self.contract_work()
+        if not work:
+            return []
+
+        payment_factor = 1 - self.project.advance - self.project.retention
+        billed_work = [work[0] * (1 - self.project.wieb)]
+        previous_work = work[0]
+        for period_work in work[1:]:
+            billed_work.append(
+                period_work * (1 - self.project.wieb)
+                + previous_work * self.project.wieb
+            )
+            previous_work = period_work
+        billed_work.append(previous_work * self.project.wieb)
+        return [value * payment_factor for value in billed_work]
+
     def outflow(self) -> list:
         """Sum current activity outflows by period."""
         return [sum(values) for values in zip_longest(
@@ -247,7 +282,7 @@ class CashflowCalculator():
 
     def snapshot(self) -> dict:
         if not self.work_cf:
-            return {
+            empty_snapshot = {
                 "workflow": [],
                 "inflow": [],
                 "outflow": [],
@@ -255,6 +290,9 @@ class CashflowCalculator():
                 "outflow_with_interest": [],
                 "duration": 0,
             }
+            if getattr(self.project, "financing_facilities", None):
+                return self._apply_facilities(empty_snapshot)
+            return empty_snapshot
 
         workflow = self.workflow()
         inflow = self.inflow()
@@ -275,7 +313,7 @@ class CashflowCalculator():
                 balance += amount
             outflow_with_interest.append(balance)
 
-        return {
+        snapshot = {
             "workflow": self._round_flow(workflow),
             "inflow": self._round_flow(inflow),
             "outflow": self._round_flow(outflow),
@@ -283,6 +321,32 @@ class CashflowCalculator():
             "outflow_with_interest": self._round_flow(outflow_with_interest),
             "duration": self.duration,
         }
+        if getattr(self.project, "financing_facilities", None):
+            return self._apply_facilities(snapshot)
+        return snapshot
+
+    def _apply_facilities(self, snapshot):
+        from q_flow.financing import calculate_financing
+
+        result = calculate_financing(
+            inflows=snapshot["inflow"],
+            outflows=snapshot["outflow"],
+            ppc_base=self._round_flow(self.ppc_base()),
+            ppc_issued=self._round_flow(self.ppc_issued()),
+            facilities=self.project.financing_facilities or [],
+        )
+        snapshot.update({
+            "facility_rows": result["facilities"],
+            "facility_inflow": result["facility_draws"],
+            "facility_outflow": result["principal_repayments"],
+            "facility_interest": result["facility_interest"],
+            "facility_fees": result["facility_fees"],
+            "funded_netflow": result["net_cash_flow"],
+            "pre_financing_balance": result["pre_financing_balance"],
+            "unfunded_shortfall": result["unfunded_shortfall"],
+            "outflow_with_interest": result["funded_cash_balance"],
+        })
+        return snapshot
 
     def print_project_cashflow(self):
         cf = self

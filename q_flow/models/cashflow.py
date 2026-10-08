@@ -40,6 +40,7 @@ class Cashflow(db.Model, BaseMixin):
     use_independent_inflow_curve = db.Column(db.Boolean, nullable=True, default=True)
     inflow_curve_type = db.Column(db.String(16), nullable=True, default="s_curve")
     inflow_curve_skew = db.Column(db.Float, nullable=True, default=0.0)
+    financing_facilities = db.Column(db.JSON, nullable=True, default=list)
 
     def compact_dict(self):
         return {
@@ -75,10 +76,17 @@ class Cashflow(db.Model, BaseMixin):
             if snapshot["outflow_with_interest"]
             else 0.0
         )
-        financing_cost = max(
-            0.0,
-            round(total_inflow - direct_cost - final_cash_balance, 2),
-        )
+        if "facility_interest" in snapshot:
+            financing_cost = round(
+                sum(snapshot["facility_interest"])
+                + sum(snapshot["facility_fees"]),
+                2,
+            )
+        else:
+            financing_cost = max(
+                0.0,
+                round(total_inflow - direct_cost - final_cash_balance, 2),
+            )
         total_cost = round(direct_cost + financing_cost, 2)
         summary = {
             "total_inflow": round(total_inflow, 2),
@@ -92,6 +100,27 @@ class Cashflow(db.Model, BaseMixin):
             "dlp": self.dlp or 0,
             "financial_horizon": len(snapshot["outflow_with_interest"]),
         }
+        if "facility_rows" in snapshot:
+            pre_finance = snapshot["pre_financing_balance"]
+            lowest_balance = min(pre_finance, default=0.0)
+            unfunded = snapshot["unfunded_shortfall"]
+            summary.update({
+                "peak_pre_financing_need": round(max(0.0, -lowest_balance), 2),
+                "peak_pre_financing_period": (
+                    pre_finance.index(lowest_balance) if pre_finance else None
+                ),
+                "contractor_contribution": round(sum(
+                    sum(row["draw"])
+                    for row in snapshot["facility_rows"]
+                    if row["type"].casefold() in {"owner's injection", "contractor contribution"}
+                ), 2),
+                "total_facility_interest": round(sum(snapshot["facility_interest"]), 2),
+                "total_facility_fees": round(sum(snapshot["facility_fees"]), 2),
+                "peak_unfunded_shortfall": round(max(unfunded, default=0.0), 2),
+                "unfunded_draw_total": round(sum(
+                    sum(row["unfunded_draw"]) for row in snapshot["facility_rows"]
+                ), 2),
+            })
 
         data = super().as_dict()
         data.update({

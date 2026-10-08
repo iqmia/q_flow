@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import func
 
 from q_flow.exceptions import InvalidData, MissingData, ProjectNotDeleted, ProjectNotFound
+from q_flow.financing import FACILITY_PRESETS, validate_financing_facilities
 from q_flow.extensions import db
 from q_flow.models.activity import Activity, ActivityType
 from q_flow.models.cashflow import Cashflow
@@ -36,6 +37,7 @@ _CASHFLOW_IMPORT_FIELDS = {
     "use_independent_inflow_curve",
     "inflow_curve_type",
     "inflow_curve_skew",
+    "financing_facilities",
 }
 _ACTIVITY_IMPORT_FIELDS = {
     "name",
@@ -55,6 +57,12 @@ _ACTIVITY_IMPORT_FIELDS = {
     "skew",
     "no_billing_period",
 }
+
+
+@cashflows.route("/financing-facility-presets")
+def financing_facility_presets():
+    """Return editable suggested models for the financing-plan UI."""
+    return jsonify(data=list(FACILITY_PRESETS)), 200
 
 
 def _permission(user, cashflow: Cashflow, permission: str):
@@ -134,6 +142,14 @@ def _validate_cashflow(cashflow):
             _finite_number(skew) and -1 < skew < 1,
             "Cashflow inflow_curve_skew must be finite and between -1 and 1",
         )
+
+    facility_errors = validate_financing_facilities(
+        getattr(cashflow, "financing_facilities", None) or []
+    )
+    InvalidData.require_condition(
+        not facility_errors,
+        "; ".join(facility_errors),
+    )
 
 
 def _apply_cashflow_updates(cashflow, data, user_id):

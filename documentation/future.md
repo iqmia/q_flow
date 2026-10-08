@@ -106,35 +106,40 @@ A future facility should have common terms such as:
 
 For a limited facility, available capacity is based on the facility limit less outstanding principal, where outstanding principal is principal drawn minus principal repaid.
 
-### Composable draw and repayment rules
+### Facility setup and calculation rules
 
-The main design direction is to treat a financing product as a combination of a **draw method** and a **repayment method**, rather than building a separate calculation model for every named banking product.
+The user selects a suggested facility model or creates a custom one. A preset supplies editable defaults; it does not lock the facility to a product-specific calculation. Each saved facility has a user-defined name for its cashflow rows, a product type, draw method, repayment method, availability start/end, limit, fees, interest rate, and revolving setting. Method-specific inputs include a scheduled draw/repayment table, PPC advance/repayment percentages, equal-installment start/interval/count, or sweep priority.
 
-Possible draw methods include:
+Draw methods:
 
-- **Automatic cash-shortfall draw** — draw when the pre-financing cash balance would otherwise be negative, subject to available capacity. This fits overdraft-style funding and can also represent contractor funding used to close residual gaps.
-- **Scheduled draw** — the user specifies the project period and amount. This can represent funded LCs, equipment finance, contract-specific working-capital loans, or other planned facilities without requiring CashflowPot to know what the financing paid for.
-- **PPC-linked draw** — draw is triggered by an eligible PPC/certification amount, for products such as PPC discounting. The exact eligible series and timing rules need to be defined before implementation.
+- **Automatic shortfall:** draw only to cover a negative funded cash position, within availability and remaining capacity. OD draws run before calculated contractor/owner contribution, which covers the residual shortfall.
+- **Scheduled:** draw the entered amount in the entered period. CashflowPot does not infer LC or equipment timing from activities. A draw above remaining capacity is capped and the undrawn amount is reported.
+- **PPC base:** draw the configured share of the net PPC certificate in its issue period, capped by remaining capacity. PPC repayments use employer PPC receipts after the project payment delay.
 
-Possible repayment methods include:
+One repayment method applies to each facility:
 
-- **Cashflow sweep** — use available positive project cash to repay outstanding principal;
-- **Percentage of PPC** — repay an agreed percentage of eligible PPC receipts;
-- **Equal installments** — repay equal amounts at a selected interval; and
-- **Scheduled repayments** — user-defined repayment amounts by project period.
+- **Cashflow sweep:** repay from positive cash after all other period flows. This is the only repayment method that depends on available cash. If several facilities use it, apply their user-editable priority order; when no order is saved, the higher interest rate is repaid first.
+- **Percent of PPC:** apply the configured percentage to that period's employer PPC receipts, even if the repayment makes cash negative.
+- **Equal installments:** divide total principal drawn by the configured payment count and pay on the configured start period and interval. Pay the installment even if cash becomes negative.
+- **Scheduled:** pay the entered amount in that period, up to principal outstanding, even if cash becomes negative.
 
-These methods should be combinable. For example, a user could schedule an LC draw in period 5 and configure its repayment as 20% of each PPC starting from period 10.
+Every draw is an inflow row; principal repayment is an outflow row; fees and interest are separate outflow rows. Available capacity is `limit - outstanding principal` for revolving facilities and `limit - total principal drawn` for non-revolving facilities. Outstanding principal is `total drawn - total principal repaid`.
 
-### Initial facility examples
+The current backend convention charges a one-time facility fee in its availability start period and calculates interest each period on the opening principal balance. Interest is a cash outflow, not capitalized directly into that facility's principal. If cash is insufficient, automatic shortfall facilities may fund that cost according to their draw rules.
 
-- **Overdraft:** automatic cash-shortfall draw, facility limit, fees/interest, normally repaid by cashflow sweep.
-- **Contractor funding:** may use the same automatic draw mechanics as an overdraft, with its own optional limit and funding cost.
-- **PPC discounting:** PPC-linked draw with an advance percentage and facility limit; later receipts repay the outstanding advance according to the agreed terms.
-- **Funded LC:** scheduled draw, with repayment selected independently from the draw schedule.
-- **Equipment finance:** scheduled draw with installment, scheduled, or other agreed repayment terms.
-- **Contract-specific working-capital finance:** planned/scheduled draw with sweep, installment, PPC-linked, or scheduled repayment.
+The initial editable suggestions are:
 
-A guarantee-only LC does not create a project cash movement and therefore does not need to be included in this cash-flow feature unless CashflowPot later adds a separate non-cash facility-capacity model.
+| Facility type | Draw default | Repayment default |
+|---|---|---|
+| Letter of Credit | Scheduled | Percent of PPC |
+| Overdraft | Automatic shortfall | Cashflow sweep |
+| PPC Discount | PPC base | Percent of PPC |
+| Working Capital | Scheduled | Percent of PPC |
+| Equipment Loan | Scheduled | Scheduled |
+| Owner's Injection | Automatic shortfall | Cashflow sweep |
+| Other | Scheduled | Cashflow sweep |
+
+A guarantee-only LC has no cash draw and stays outside the cashflow calculation. If the bank pays a supplier, enter the funded amount as a scheduled LC draw and model repayment using the selected method.
 
 ### Intended outputs
 
@@ -150,16 +155,11 @@ The financing layer should eventually show at least:
 
 Facility adequacy should be judged by **amount, timing, availability, and outstanding capacity**, not simply by adding nominal facility limits.
 
-### Details to settle before implementation
+### Implementation sequence and remaining work
 
-The following remain intentionally open for later design:
+The approved sequence is Python calculation/API first, Flutter facility editing second, and Excel report rows last. The calculation must expose pre-financing cash, facility draws, principal repayments, interest, fees, balances, available capacity, and any unfunded shortfall. The current Excel workbook is print-formatted for A4 landscape and A3; facility rows must preserve its existing column widths and scaling.
 
-- priority when multiple automatic facilities can fund the same shortfall;
-- exact PPC-linked draw and repayment mechanics;
-- interest and fee calculation conventions by facility;
-- repayment ordering when several facilities are outstanding;
-- contractor-funding repayment behavior; and
-- interaction between financing repayments and available positive cash.
+Backend conventions above make the period loop deterministic. They should be revisited only if bank negotiations require different terms. Guarantee-only LC capacity/fees, additional facility types, and sensitivity/report presentation can be addressed separately.
 
 ## 6. Not an assumed roadmap item
 

@@ -64,6 +64,22 @@ Example:
   "use_independent_inflow_curve": true,
   "inflow_curve_type": "s_curve",
   "inflow_curve_skew": 0.0,
+  "financing_facilities": [
+    {
+      "id": "od-1",
+      "name": "Project overdraft",
+      "type": "Overdraft",
+      "draw_method": "automatic_shortfall",
+      "repayment_method": "cashflow_sweep",
+      "start": 0,
+      "end": 12,
+      "limit": 200000,
+      "fees": 500,
+      "interest_rate": 0.01,
+      "revolving": true,
+      "sweep_priority": 0
+    }
+  ],
   "activities": []
 }
 ```
@@ -84,8 +100,17 @@ wieb
 use_independent_inflow_curve
 inflow_curve_type
 inflow_curve_skew
+financing_facilities
 activities
 ```
+
+`financing_facilities` is optional for older version-1 files. Each facility is
+an editable input model. Scheduled draws and repayments use period-to-amount
+maps; PPC discounts use `advance_portion`; PPC repayments use
+`repayment_percent`; equal installments use `installment_start`,
+`installment_interval`, and `installment_count`. A scheduled facility draw is
+capped at available capacity, with the undrawn amount reported in the
+calculated snapshot.
 
 `name` must be non-empty text. `description`, when present, must be text.
 
