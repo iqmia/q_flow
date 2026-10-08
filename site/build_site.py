@@ -202,19 +202,23 @@ def _render_sitemap_xml() -> str:
 def _render_llms_txt() -> str:
     return (
         '# CashflowPot\n\n'
-        'CashflowPot is a construction cash-flow simulation and forecasting product for '
+        '> CashflowPot is a construction cash-flow simulation and forecasting product for '
         'project, commercial and finance decisions. It turns execution timing, contract '
         'terms and forecasting assumptions into expected inflow, outflow, cash position '
         'and working-capital/funding exposure.\n\n'
         '## Canonical public pages\n'
-        f'- Home: {SITE_ORIGIN}/\n'
-        f'- How it works: {SITE_ORIGIN}/how-it-works/\n'
-        f'- Methodology: {SITE_ORIGIN}/methodology/\n'
-        f'- About: {SITE_ORIGIN}/about/\n\n'
-        '## Application and publisher\n'
-        f'- Application: {SITE_ORIGIN}/app/\n'
+        f'- [Home]({SITE_ORIGIN}/): Product overview and use cases.\n'
+        f'- [How it works]({SITE_ORIGIN}/how-it-works/): How scenarios are built and revised.\n'
+        f'- [Methodology]({SITE_ORIGIN}/methodology/): Cash-flow model concepts, commercial terms and forecasting assumptions.\n'
+        f'- [About]({SITE_ORIGIN}/about/): Product and operator information.\n'
+        f'- [Contact]({SITE_ORIGIN}/contact/): Official Quollnet contact channels.\n'
+        f'- [Privacy]({SITE_ORIGIN}/privacy/): CashflowPot privacy information.\n'
+        f'- [Terms]({SITE_ORIGIN}/terms/): CashflowPot terms of use.\n\n'
+        '## Application\n'
+        f'- [Open CashflowPot]({SITE_ORIGIN}/app/): Interactive web application. The public pages above are the canonical product information.\n\n'
+        '## Operator\n'
         '- CashflowPot is part of the Quollnet ecosystem for engineering and construction.\n'
-        '- Quollnet listing: https://quollnet.com/apps/cashflowpot\n'
+        '- [CashflowPot on Quollnet](https://quollnet.com/apps/cashflowpot): Quollnet product listing.\n'
     )
 
 
