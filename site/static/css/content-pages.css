@@ -3,6 +3,7 @@
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   column-gap: 10px;
+  row-gap: 8px;
   align-items: center;
   flex: 0 0 auto;
 }
@@ -12,6 +13,13 @@
   display: block;
   align-self: center;
   text-decoration: none;
+}
+
+.brand__name,
+.brand__parent {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .brand__name {
