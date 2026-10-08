@@ -338,11 +338,6 @@ def validate_financing_facilities(facilities):
                 or not isfinite(value) or value < 0
             ):
                 errors.append(f"{prefix} {field.replace('_', ' ')} must be a finite non-negative number")
-        if (
-            facility.get("limit") is None
-            and str(facility_type or "").casefold() not in {"owner's injection", "contractor contribution"}
-        ):
-            errors.append(f"{prefix} limit is required")
         for field in ("advance_portion", "repayment_percent"):
             value = facility.get(field)
             if value is not None and value > 1:
