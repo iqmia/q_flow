@@ -11,6 +11,7 @@
   --outflow: #C9796F;
   --cost: #7F9FB2;
   --balance: #8D7047;
+  --eyebrow: #876A42;
   --focus: #E89A5B;
   --radius-control: 12px;
   --radius-card: 14px;
@@ -28,6 +29,7 @@
     --text-muted: #B9B4AC;
     --border: #454943;
     --balance: #CDB58A;
+    --eyebrow: #CDB58A;
     --shadow-subtle: 0 8px 24px rgb(0 0 0 / 0.16);
   }
 }
@@ -220,7 +222,7 @@ p {
 
 .eyebrow {
   margin-bottom: 12px;
-  color: var(--balance);
+  color: var(--eyebrow);
   font-size: 0.76rem;
   font-weight: 750;
   letter-spacing: 0.09em;
