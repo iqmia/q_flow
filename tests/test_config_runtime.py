@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from q_flow import create_app
 from q_flow.services import utils as utils_module
 from q_flow.services.file_sys import FileSys
 
@@ -47,7 +48,7 @@ def test_production_config_uses_database_url_and_storage_override(monkeypatch):
         },
     )
 
-    assert module.Config.SQLALCHEMY_DATABASE_URI == database_url
+    assert module.Config.DATABASE_URL == database_url
     assert module.Config.STORAGE_PATH == "/srv/cashflowpot/storage"
 
 
@@ -55,17 +56,59 @@ def test_local_config_does_not_require_env_local(monkeypatch):
     module = _import_config(monkeypatch, {"SECRET_KEY": "production-secret"})
 
     assert module.LocalConfig.DEBUG is True
-    assert module.LocalConfig.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///")
+    assert module.LocalConfig.DATABASE_URL == ""
 
 
-def test_test_config_always_uses_sqlite(monkeypatch):
+def test_test_config_always_selects_sqlite_fallback(monkeypatch):
     module = _import_config(
         monkeypatch,
         {"DATABASE_URL": "postgresql+psycopg://prod@localhost/prod"},
     )
 
-    assert module.TestConfig.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///")
     assert module.TestConfig.DATABASE_URL == ""
+
+
+def test_app_uses_database_url_when_configured(tmp_path):
+    database_url = "sqlite:///:memory:"
+
+    class RuntimeConfig:
+        TESTING = True
+        STORAGE_PATH = str(tmp_path)
+        PROJECT_PHOTOS = "project_photos"
+        DATABASE_URL = database_url
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    app = create_app(RuntimeConfig)
+
+    assert app.config["SQLALCHEMY_DATABASE_URI"] == database_url
+
+
+def test_app_builds_sqlite_uri_from_final_storage_path(tmp_path):
+    class RuntimeConfig:
+        TESTING = True
+        STORAGE_PATH = str(tmp_path)
+        PROJECT_PHOTOS = "project_photos"
+        DATABASE_URL = ""
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    app = create_app(RuntimeConfig)
+
+    assert app.config["SQLALCHEMY_DATABASE_URI"] == (
+        f"sqlite:///{os.path.join(str(tmp_path), 'q_flow.db')}"
+    )
+
+
+def test_subclass_storage_override_gets_its_own_sqlite_database(tmp_path, monkeypatch):
+    module = _import_config(monkeypatch, {"SECRET_KEY": "production-secret"})
+
+    class IsolatedTestConfig(module.TestConfig):
+        STORAGE_PATH = str(tmp_path)
+
+    app = create_app(IsolatedTestConfig)
+
+    assert app.config["SQLALCHEMY_DATABASE_URI"] == (
+        f"sqlite:///{os.path.join(str(tmp_path), 'q_flow.db')}"
+    )
 
 
 def test_file_sys_does_not_replace_configured_database_uri(tmp_path):
