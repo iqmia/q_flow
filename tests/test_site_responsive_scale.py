@@ -12,7 +12,7 @@ def test_shared_template_loads_responsive_scale_css():
 
 def test_responsive_scale_caps_desktop_headings_and_tightens_hero():
     text = CSS.read_text(encoding='utf-8')
-    assert 'clamp(2.5rem, 4.1vw, 4.15rem)' in text
+    assert 'clamp(2.5rem, 3.5vw, 4rem)' in text
     assert 'padding-block: clamp(48px, 6vw, 76px)' in text
     assert 'grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr)' in text
 
