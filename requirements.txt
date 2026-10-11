@@ -7,6 +7,9 @@ Flask-buzz==3.1.0
 Flask-migrate==4.0.7
 Flask-cors==4.0.1
 
+gunicorn==26.2.0
+psycopg[binary]>=3.2,<4
+
 requests==2.31.0
 google-auth-oauthlib==1.2.0
 pyjwt==2.8.0
