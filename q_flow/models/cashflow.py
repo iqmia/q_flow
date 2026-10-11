@@ -16,7 +16,7 @@ class Cashflow(db.Model, BaseMixin):
 
     unit_id = db.Column(db.String(64), index=True)
     name = db.Column(db.String(64))
-    description = db.Column(db.String(256))
+    description = db.Column(db.Text)
     # Legacy identity columns are retained until the old database format can
     # be retired; QAuth is authoritative for Unit photo and colour.
     photo = db.Column(db.String(64))
