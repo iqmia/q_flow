@@ -33,6 +33,10 @@ def _build_page(relative_path: str):
 
 
 class SiteBuildTest(TestCase):
+    def test_production_web_root_matches_virtualmin_document_root(self):
+        module = _load_builder()
+        self.assertEqual(module.DEFAULT_WEB_ROOT, Path('/home/cashflowpot/public_html'))
+
     def test_build_copies_shared_css_and_cleans_stale_output(self):
         module = _load_builder()
         with tempfile.TemporaryDirectory() as temp_dir:
