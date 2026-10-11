@@ -5,18 +5,16 @@ extensions depend on the storage directory.
 
 This module contains the FileSys class which is responsible for saving files to
 the storage directory.
-
-in the init_app method, the storage directory is created if it doesn't exist and
-loads the secret keys from the env.q file in the storage directory.
 '''
 
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 import os
-from flask import Flask, json
+from flask import Flask
 
-from q_flow.exceptions import InvalidData, Keys_Not_Found
+from q_flow.exceptions import InvalidData
 from q_flow.services.utils import gen_id
+
 
 class FileSys:
     def __init__(self):
@@ -26,14 +24,11 @@ class FileSys:
 
     def init_app(self, app: Flask):
         '''
-        Initialize the FileSys class with the app instance. Create the storage
-        directory if it doesn't exist and sets the database uri.
-        IMPORTANT: This method should be called before any other extension is
-        initialized in the __init__.py file of the package
+        Initialize the FileSys class with the app instance and create the
+        configured storage directories when they do not exist.
         '''
         self.app = app
 
-        # create the storage directory if it doesn't exist
         self.storage_dir = app.config.get("STORAGE_PATH")
         print(self.storage_dir)
         if not os.path.exists(self.storage_dir):
@@ -44,9 +39,6 @@ class FileSys:
         if not os.path.exists(self.project_photos):
             os.makedirs(self.project_photos)
 
-        # set the database uri
-        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{self.storage_dir}/q_flow.db'
-
     def allowed_image(self, filename: str):
         return '.' in filename and \
             filename.rsplit('.', 1)[1].lower() in \
@@ -56,7 +48,6 @@ class FileSys:
         '''
         Delete the current photo if it exists and save the new logo
         '''
-        # check if the file is an image of acceptable type
         if not image:
             return None
 
