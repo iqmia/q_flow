@@ -33,10 +33,10 @@ The Flutter application is maintained separately in `iqmia/cashflowpot`.
 ```text
 cashflowpot.com/      static public website generated from site/
 cashflowpot.com/app/  Flutter application
-cashflowpot.com/api/  q_flow Flask API mounted by Passenger
+cashflowpot.com/api/  q_flow Flask API through Apache + Gunicorn
 ```
 
-Passenger provides the public `/api` base URI; Flask routes remain internally unprefixed.
+Apache exposes the public `/api/` prefix and reverse-proxies to Gunicorn on `127.0.0.1:5002`; Flask routes remain internally unprefixed.
 
 ## Public-site commands
 
@@ -52,9 +52,9 @@ Local build only:
 python site/build_site.py -l
 ```
 
-Generated static output is written to `site/dist/` and is not committed.
+Generated static output is written to `site/dist/` and is not committed. Production publishing targets `/home/cashflowpot/public_html`.
 
-See [`documentation/deployment.md`](documentation/deployment.md) for the production web-root/Passenger layout and deployment rules.
+See [`documentation/deployment.md`](documentation/deployment.md) for the Virtualmin/Apache/Gunicorn layout and deployment rules.
 
 ## Tests
 
