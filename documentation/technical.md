@@ -18,14 +18,16 @@ The same domain exposes three independent surfaces:
 ```text
 cashflowpot.com/      static public website
 cashflowpot.com/app/  Flutter application
-cashflowpot.com/api/  Flask API mounted by Passenger
+cashflowpot.com/api/  Flask API through Apache + Gunicorn
 ```
 
-The Flask application itself defines routes without an `/api` prefix. Passenger supplies that public prefix in production.
+Apache exposes `/api/` and reverse-proxies to Gunicorn on `127.0.0.1:5002`. The Flask application itself defines routes without an `/api` prefix.
+
+The Gunicorn process is managed by systemd as `cashflowpot-qflow.service`, with `/home/cashflowpot/q_flow` as the working directory and `wsgi:app` as the application entrypoint.
 
 See [`deployment.md`](deployment.md) for the exact server layout and commands.
 
-## 3. Flask application
+## 3. Flask application and persistence
 
 `q_flow.create_app()` initializes the core extensions and registers the current blueprints:
 
@@ -35,13 +37,13 @@ See [`deployment.md`](deployment.md) for the exact server layout and commands.
 - `users` — QAuth-facing user flows;
 - `system` — system/health routes.
 
-The application uses SQLAlchemy. The current file-system service configures the database as SQLite at:
+The application uses SQLAlchemy. Production uses PostgreSQL from the configured `DATABASE_URL` and psycopg driver. The current production storage directory is:
 
 ```text
-<STORAGE_PATH>/q_flow.db
+/home/cashflowpot/q_flow/main_storage
 ```
 
-Production `STORAGE_PATH` is currently configured under the q_flow server directory. Tests use a test storage location/configuration.
+When `DATABASE_URL` is absent, the application can fall back to SQLite at `<STORAGE_PATH>/q_flow.db`, which remains useful for local/test-compatible operation. Tests use their own test configuration and storage.
 
 ## 4. Project identity and QAuth
 
@@ -83,6 +85,7 @@ Important groups of fields include:
 - client terms: `advance`, `retention`, `release_retention_eop`, `dlp`, `duration_for_payment`;
 - finance/value: `interest_rate`, `contract_value`, `wieb`;
 - inflow method: `use_independent_inflow_curve`, `inflow_curve_type`, `inflow_curve_skew`;
+- financing facilities: nullable JSON facility definitions;
 - relationship: `activities`.
 
 New scenarios use Independent inflow defaults; legacy rows can retain null values in the independent-inflow columns and therefore remain activity-linked.
@@ -108,8 +111,8 @@ Important classes are:
 
 - `Work` — generates linear or S-curve marginal work and corrects the curve to preserve total value;
 - `Activity_cf` — calculates activity work and activity outflow;
-- `CashflowCalculator` — combines active activities, selects the contract-value inflow method, calculates project inflow/outflow/net cash, and applies financing to negative cumulative balances.
-- `calculate_financing` — applies optional facility definitions in period order, returning facility draw, repayment, cost, capacity, funded balance, and shortfall series. The `financing_facilities` JSON column is nullable for existing scenarios; run `flask add-financing-facilities-column` after deploying the code to upgrade an existing database.
+- `CashflowCalculator` — combines active activities, selects the contract-value inflow method, calculates project inflow/outflow/net cash, and applies financing to negative cumulative balances;
+- `calculate_financing` — applies optional facility definitions in period order, returning facility draw, repayment, cost, capacity, funded balance, and shortfall series.
 
 `Project_cf` remains as a compatibility alias for `CashflowCalculator`.
 
@@ -195,7 +198,7 @@ site/static/
 site/build_site.py
 ```
 
-`build_site.py` renders the reviewed page set into `site/dist/` and, in normal production mode, publishes only the site-owned entries into the production web root.
+`build_site.py` renders the reviewed page set into `site/dist/` and, in normal production mode, publishes only the site-owned entries into `/home/cashflowpot/public_html`.
 
 The builder maintains an authoritative `PublicPage` registry containing each page's output destination, canonical path, indexing status, title/description metadata, and schema type. That registry drives sitemap membership and supplies the shared Jinja shell with canonical/search/social metadata.
 
@@ -236,4 +239,4 @@ Some current names exist for historical compatibility and should not be treated 
 
 Do not rename these casually without a migration/compatibility plan. User-facing language should remain clear even while legacy backend names exist.
 
-Last reviewed: 7 October 2026.
+Last reviewed: 11 October 2026.
