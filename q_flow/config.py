@@ -27,13 +27,11 @@ class Config(object):
         'png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff', 'bmp', 'svg', 'ico'
         }
 
-    # Database settings. DATABASE_URL is authoritative when supplied; SQLite
-    # remains the fallback for lightweight/local installations.
+    # Database settings. DATABASE_URL is authoritative when supplied. When it
+    # is blank, create_app() builds the SQLite URI from the final STORAGE_PATH
+    # so subclasses can override storage without sharing the same test DB.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DATABASE_URL = data.get('DATABASE_URL', '')
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL or (
-        f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
-    )
 
     # Email settings
     MAIL_SERVER = 'premium106.web-hosting.com'
@@ -72,9 +70,6 @@ class LocalConfig(Config):
 
     STORAGE_PATH = data.get('STORAGE_PATH') or path.join(Config.BASE_DIR, 'main_storage')
     DATABASE_URL = data.get('DATABASE_URL', '')
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL or (
-        f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
-    )
     USER_API_URL = 'http://localhost:5000/user/'
 
     SECRET_KEY = data.get('SECRET_KEY', Config.SECRET_KEY)
@@ -97,7 +92,6 @@ class TestConfig(Config):
     TESTING = True
     STORAGE_PATH = path.join(Config.BASE_DIR, 'test_storage')
     DATABASE_URL = ''
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
     JWT_EXP_DELTA_SECONDS = 60
 
     USER_API_URL = 'http://localhost:5000/user'
