@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from q_flow import create_app
+from q_flow.config import TestConfig
 from q_flow.services import utils as utils_module
 from q_flow.services.file_sys import FileSys
 
@@ -71,12 +72,9 @@ def test_test_config_always_selects_sqlite_fallback(monkeypatch):
 def test_app_uses_database_url_when_configured(tmp_path):
     database_url = "sqlite:///:memory:"
 
-    class RuntimeConfig:
-        TESTING = True
+    class RuntimeConfig(TestConfig):
         STORAGE_PATH = str(tmp_path)
-        PROJECT_PHOTOS = "project_photos"
         DATABASE_URL = database_url
-        SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     app = create_app(RuntimeConfig)
 
@@ -84,12 +82,9 @@ def test_app_uses_database_url_when_configured(tmp_path):
 
 
 def test_app_builds_sqlite_uri_from_final_storage_path(tmp_path):
-    class RuntimeConfig:
-        TESTING = True
+    class RuntimeConfig(TestConfig):
         STORAGE_PATH = str(tmp_path)
-        PROJECT_PHOTOS = "project_photos"
         DATABASE_URL = ""
-        SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     app = create_app(RuntimeConfig)
 
