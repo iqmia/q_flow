@@ -2,11 +2,11 @@
    headings dominate desktop/laptop viewports. Loaded after the shared styles. */
 
 h1 {
-  font-size: clamp(2.5rem, 4.1vw, 4.15rem);
+  font-size: clamp(2.5rem, 3.5vw, 4rem);
 }
 
 h2 {
-  font-size: clamp(1.55rem, 2.45vw, 2.2rem);
+  font-size: clamp(1.55rem, 2.35vw, 2.15rem);
 }
 
 .hero {
@@ -19,21 +19,21 @@ h2 {
 }
 
 .hero__content {
-  max-width: 610px;
+  max-width: 630px;
 }
 
 .hero__content h1 {
-  max-width: 610px;
+  max-width: 630px;
   margin-bottom: 20px;
 }
 
 .hero__lead {
-  max-width: 590px;
-  font-size: clamp(1.02rem, 1.25vw, 1.16rem);
+  max-width: 600px;
+  font-size: clamp(1.02rem, 1.2vw, 1.14rem);
 }
 
 .hero__support {
-  max-width: 590px;
+  max-width: 600px;
   margin-bottom: 24px;
 }
 
@@ -68,7 +68,7 @@ main .site-shell > h1 {
 
 @media (max-width: 1100px) {
   h1 {
-    font-size: clamp(2.45rem, 5vw, 3.55rem);
+    font-size: clamp(2.45rem, 5vw, 3.45rem);
   }
 
   .hero__grid {
@@ -84,7 +84,7 @@ main .site-shell > h1 {
 
 @media (max-width: 900px) {
   h1 {
-    font-size: clamp(2.4rem, 6.6vw, 3.2rem);
+    font-size: clamp(2.4rem, 6.6vw, 3.15rem);
   }
 
   .hero {
