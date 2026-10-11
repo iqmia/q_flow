@@ -3,7 +3,6 @@
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   column-gap: 10px;
-  row-gap: 8px;
   align-items: center;
   flex: 0 0 auto;
 }
@@ -13,14 +12,12 @@
   display: block;
   align-self: center;
   text-decoration: none;
-  min-height: 24px;
 }
 
 .brand__name {
   grid-column: 2;
   grid-row: 1;
   align-self: end;
-  min-height: 24px;
 }
 
 .brand__logo {
@@ -35,7 +32,6 @@
   grid-column: 2;
   grid-row: 2;
   align-self: start;
-  min-height: 24px;
 }
 
 .site-footer__inner {
