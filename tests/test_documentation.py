@@ -95,19 +95,43 @@ class DocumentationTest(TestCase):
         ):
             self.assertIn(required, security)
 
-    def test_deployment_document_matches_current_builder_contract(self):
+    def test_deployment_document_matches_current_vps_contract(self):
         text = (DOCS / "deployment.md").read_text(encoding="utf-8")
         for required in (
             "cashflowpot.com/",
             "cashflowpot.com/app/",
             "cashflowpot.com/api/",
-            "~/www.cashflowpot.com",
+            "/home/cashflowpot/public_html",
+            "/home/cashflowpot/q_flow",
             "python site/build_site.py",
             "python site/build_site.py -l",
             "site/dist/",
-            "PassengerBaseURI \"/api\"",
+            "127.0.0.1:5002",
+            "cashflowpot-qflow.service",
+            "ProxyPass /api/ http://127.0.0.1:5002/",
+            "PostgreSQL",
+            "DATABASE_URL",
         ):
             self.assertIn(required, text)
+        for forbidden in (
+            "/home/iqmieeuk",
+            "~/www.cashflowpot.com",
+            "PassengerBaseURI",
+            "PassengerAppRoot",
+            "Namecheap",
+        ):
+            self.assertNotIn(forbidden, text)
+
+    def test_current_docs_do_not_describe_passenger_as_production_runtime(self):
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        technical = (DOCS / "technical.md").read_text(encoding="utf-8")
+        index = (DOCS / "README.md").read_text(encoding="utf-8")
+        combined = "\n".join((readme, technical, index))
+        self.assertNotIn("mounted by Passenger", combined)
+        self.assertNotIn("Passenger provides", combined)
+        self.assertNotIn("Passenger API", combined)
+        self.assertIn("Gunicorn", combined)
+        self.assertIn("Apache", combined)
 
     def test_search_discovery_architecture_is_documented(self):
         deployment = (DOCS / "deployment.md").read_text(encoding="utf-8")
