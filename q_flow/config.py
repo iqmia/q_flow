@@ -1,9 +1,5 @@
 from os import path
-from re import A
-from flask import json
 
-
-from q_flow.exceptions import Keys_Not_Found
 from q_flow.services.utils import get_env
 
 
@@ -18,17 +14,26 @@ class Config(object):
     TESTING = False
     LOG_LEVEL = 'DEBUG'  # CRITICAL / ERROR / WARNING / INFO / DEBUG
 
+    # Resolve application paths from the repository root so production does
+    # not depend on the process working directory.
+    BASE_DIR = path.dirname(path.dirname(path.abspath(__file__)))
+    ENV_FILE = path.join(BASE_DIR, 'env.json')
+    data = get_env(ENV_FILE)
+
     # Folders and Files
-    STORAGE_PATH = '/home/iqmieeuk/q_flow/main_storage'  # full path to the storage directory
-    PROJECT_PHOTOS = 'project_photos' # in the STORAGE_PATH (see file_sys.py)
+    STORAGE_PATH = data.get('STORAGE_PATH') or path.join(BASE_DIR, 'main_storage')
+    PROJECT_PHOTOS = 'project_photos'
     ALLOWED_IMAGES = {
         'png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff', 'bmp', 'svg', 'ico'
         }
 
-    # Database settings
+    # Database settings. DATABASE_URL is authoritative when supplied; SQLite
+    # remains the fallback for lightweight/local installations.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    # the database uri is set in the file_sys.py so we comment it here
-    # SQLALCHEMY_DATABASE_URI = f'sqlite:////q_auth.db'
+    DATABASE_URL = data.get('DATABASE_URL', '')
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL or (
+        f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
+    )
 
     # Email settings
     MAIL_SERVER = 'premium106.web-hosting.com'
@@ -44,9 +49,7 @@ class Config(object):
     USER_API_URL = 'https://quollnet.com/api/user/'
     GOOGLE_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
 
-    # Load secret keys from file
-    ENV_FILE = 'env.json'
-    data = get_env(ENV_FILE)
+    # Secret keys loaded from env.json
     SECRET_KEY = data.get('SECRET_KEY', '')
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')
     APP_ID = data.get('APP_ID', '')
@@ -57,34 +60,44 @@ class Config(object):
     GOOGLE_CLIENT_ID = data.get('GOOGLE_CLIENT_ID', '')
     GOOGLE_CLIENT_SECRET = data.get('GOOGLE_CLIENT_SECRET', '')
 
+
 class LocalConfig(Config):
     '''
     Local configurations
     '''
     DEBUG = True
     TESTING = False
-    STORAGE_PATH = 'c:/user/esaad/code/q_flow/main_storage'
+    ENV_FILE = path.join(Config.BASE_DIR, 'env_local.json')
+    data = get_env(ENV_FILE) if path.exists(ENV_FILE) else {}
+
+    STORAGE_PATH = data.get('STORAGE_PATH') or path.join(Config.BASE_DIR, 'main_storage')
+    DATABASE_URL = data.get('DATABASE_URL', '')
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL or (
+        f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
+    )
     USER_API_URL = 'http://localhost:5000/user/'
-    # USER_API_URL = 'https://quollnet.com/api/user'
-    
-    # Load secret keys from file
-    # ENV_FILE = 'env_local.json'
-    ENV_FILE = 'env_local.json'
-    data = get_env(ENV_FILE)
-    SECRET_KEY = data.get('SECRET_KEY', '')
-    MAIL_PASSWORD = data.get('MAIL_PASSWORD', '')
-    APP_ID = data.get('APP_ID', '')
-    APP_SECRET = data.get('APP_SECRET', '')
-    APP_ALGO = data.get('APP_ALGO', '')
-    PUBLIC_KEY = data.get('PUBLIC_KEY', '')
-    ALGO = data.get('ALGO', '')
+
+    SECRET_KEY = data.get('SECRET_KEY', Config.SECRET_KEY)
+    MAIL_PASSWORD = data.get('MAIL_PASSWORD', Config.MAIL_PASSWORD)
+    APP_ID = data.get('APP_ID', Config.APP_ID)
+    APP_SECRET = data.get('APP_SECRET', Config.APP_SECRET)
+    APP_ALGO = data.get('APP_ALGO', Config.APP_ALGO)
+    PUBLIC_KEY = data.get('PUBLIC_KEY', Config.PUBLIC_KEY)
+    ALGO = data.get('ALGO', Config.ALGO)
+    GOOGLE_CLIENT_ID = data.get('GOOGLE_CLIENT_ID', Config.GOOGLE_CLIENT_ID)
+    GOOGLE_CLIENT_SECRET = data.get(
+        'GOOGLE_CLIENT_SECRET', Config.GOOGLE_CLIENT_SECRET
+    )
+
 
 class TestConfig(Config):
     '''
     Test configurations
     '''
     TESTING = True
-    STORAGE_PATH = path.join(path.dirname(path.dirname(__file__)), 'test_storage')
+    STORAGE_PATH = path.join(Config.BASE_DIR, 'test_storage')
+    DATABASE_URL = ''
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{path.join(STORAGE_PATH, 'q_flow.db')}"
     JWT_EXP_DELTA_SECONDS = 60
 
     USER_API_URL = 'http://localhost:5000/user'
