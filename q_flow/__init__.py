@@ -6,6 +6,7 @@ The file env.json is used to store the secret keys
     only_with_permission decorator to restrict access to certain routes.
 2. SECRET_KEY: This key is used by flask to secure the session.
 '''
+from os import path
 
 from json import dumps
 from flask import Config, Flask, jsonify, g
@@ -15,9 +16,18 @@ from q_flow.commands.add_financing_facilities_column import add_financing_facili
 from q_flow.commands.migrate_project_cashflows import migrate_projects_to_cashflows
 from q_flow.extensions import db, fs, lg, u_api, mail, er, cors
 
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    database_url = app.config.get('DATABASE_URL')
+    if database_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = (
+            f"sqlite:///{path.join(app.config['STORAGE_PATH'], 'q_flow.db')}"
+        )
 
     fs.init_app(app)
     lg.init_app(app)
