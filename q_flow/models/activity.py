@@ -53,17 +53,18 @@ def _distribution_default(context):
 
 
 def effective_activity_mode(activity) -> str:
-    """Return the calculation mode while preserving legacy nullable rows."""
-    return activity.activity_mode or "work"
+    """Return the calculation mode while preserving legacy nullable/missing rows."""
+    return getattr(activity, "activity_mode", None) or "work"
 
 
 def effective_distribution_type(activity) -> str:
     """Return the calculation distribution for new and legacy activities."""
     if effective_activity_mode(activity) == "scheduled_cost":
         return "manual"
-    if activity.distribution_type:
-        return activity.distribution_type
-    if str(activity.activity_type or "").casefold() == "linear":
+    stored = getattr(activity, "distribution_type", None)
+    if stored:
+        return stored
+    if str(getattr(activity, "activity_type", None) or "").casefold() == "linear":
         return "linear"
     return "s_curve"
 
@@ -118,7 +119,7 @@ def normalize_activity(activity):
         mode == "scheduled_cost" or activity.distribution_type == "manual"
     )
     if uses_schedule:
-        schedule = _normalized_schedule(activity.cost_schedule_json)
+        schedule = _normalized_schedule(getattr(activity, "cost_schedule_json", None))
         activity.cost_schedule_json = schedule
         activity.cost = sum(schedule)
         activity.duration = len(schedule)
