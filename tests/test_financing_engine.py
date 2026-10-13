@@ -185,7 +185,7 @@ class FinancingEngineTests(unittest.TestCase):
         self.assertEqual(presets["overdraft"]["repayment_method"], "cashflow_sweep")
         self.assertEqual(presets["ppc_discount"]["draw_method"], "ppc_base")
 
-    def test_scheduled_draw_above_non_revolving_limit_reports_undrawn_amount(self):
+    def test_scheduled_draw_above_non_revolving_limit_caps_actual_draw_only(self):
         result = calculate_financing(
             inflows=[0],
             outflows=[0],
@@ -207,8 +207,127 @@ class FinancingEngineTests(unittest.TestCase):
 
         facility = result["facilities"][0]
         self.assertEqual(facility["draw"], [100.0])
-        self.assertEqual(facility["unfunded_draw"], [20.0])
+        self.assertNotIn("unfunded_draw", facility)
         self.assertEqual(facility["available_limit"], [0.0])
+
+    def test_scheduled_percent_ppc_repayment_uses_opening_outstanding_only(self):
+        result = calculate_financing(
+            inflows=[0, 200],
+            outflows=[0, 0],
+            ppc_base=[200, 200],
+            ppc_issued=[0, 0],
+            facilities=[{
+                "name": "LC",
+                "type": "Letter of Credit",
+                "draw_method": "scheduled",
+                "draw_schedule": {0: 500, 1: 300},
+                "repayment_method": "percent_of_ppc",
+                "repayment_percent": 1.0,
+                "limit": 1000,
+                "interest_rate": 0,
+                "fees": 0,
+                "revolving": True,
+            }],
+        )
+
+        facility = result["facilities"][0]
+        self.assertEqual(facility["repayment"], [0.0, 200.0])
+        self.assertEqual(facility["outstanding"], [500.0, 600.0])
+
+    def test_scheduled_sweep_repayment_uses_opening_outstanding_only(self):
+        result = calculate_financing(
+            inflows=[1000, 1000],
+            outflows=[0, 0],
+            ppc_base=[0, 0],
+            ppc_issued=[0, 0],
+            facilities=[{
+                "name": "LC",
+                "type": "Letter of Credit",
+                "draw_method": "scheduled",
+                "draw_schedule": {0: 500, 1: 300},
+                "repayment_method": "cashflow_sweep",
+                "limit": 1000,
+                "interest_rate": 0,
+                "fees": 0,
+                "revolving": True,
+            }],
+        )
+
+        facility = result["facilities"][0]
+        self.assertEqual(facility["repayment"][0], 0.0)
+        self.assertEqual(facility["repayment"][1], 500.0)
+        self.assertEqual(facility["outstanding"][1], 300.0)
+
+    def test_revolving_scheduled_draw_capacity_is_restored_by_repayment(self):
+        result = calculate_financing(
+            inflows=[0, 500, 0],
+            outflows=[0, 0, 0],
+            ppc_base=[0, 0, 0],
+            ppc_issued=[0, 0, 0],
+            facilities=[{
+                "name": "LC",
+                "type": "Letter of Credit",
+                "draw_method": "scheduled",
+                "draw_schedule": {0: 800, 2: 900},
+                "repayment_method": "cashflow_sweep",
+                "limit": 1000,
+                "interest_rate": 0,
+                "fees": 0,
+                "revolving": True,
+            }],
+        )
+
+        facility = result["facilities"][0]
+        self.assertEqual(facility["draw"], [800.0, 0.0, 700.0])
+        self.assertEqual(facility["repayment"], [0.0, 500.0, 0.0])
+        self.assertEqual(facility["outstanding"], [800.0, 300.0, 1000.0])
+
+    def test_non_revolving_repayment_does_not_restore_draw_capacity(self):
+        result = calculate_financing(
+            inflows=[0, 500, 0],
+            outflows=[0, 0, 0],
+            ppc_base=[0, 0, 0],
+            ppc_issued=[0, 0, 0],
+            facilities=[{
+                "name": "LC",
+                "type": "Letter of Credit",
+                "draw_method": "scheduled",
+                "draw_schedule": {0: 800, 2: 900},
+                "repayment_method": "cashflow_sweep",
+                "limit": 1000,
+                "interest_rate": 0,
+                "fees": 0,
+                "revolving": False,
+            }],
+        )
+
+        facility = result["facilities"][0]
+        self.assertEqual(facility["draw"], [800.0, 0.0, 200.0])
+        self.assertEqual(facility["repayment"], [0.0, 500.0, 0.0])
+        self.assertEqual(facility["available_limit"], [200.0, 200.0, 0.0])
+
+    def test_unlimited_scheduled_facility_is_not_capacity_capped(self):
+        result = calculate_financing(
+            inflows=[0, 0],
+            outflows=[0, 0],
+            ppc_base=[0, 0],
+            ppc_issued=[0, 0],
+            facilities=[{
+                "name": "LC",
+                "type": "Letter of Credit",
+                "draw_method": "scheduled",
+                "draw_schedule": {0: 1200, 1: 900},
+                "repayment_method": "scheduled",
+                "repayment_schedule": {},
+                "limit": None,
+                "interest_rate": 0,
+                "fees": 0,
+                "revolving": True,
+            }],
+        )
+
+        self.assertEqual(result["facilities"][0]["draw"], [1200.0, 900.0])
+        self.assertEqual(result["facilities"][0]["available_limit"], [None, None])
 
     def test_facility_fee_and_interest_are_separate_cash_outflows(self):
         result = calculate_financing(
