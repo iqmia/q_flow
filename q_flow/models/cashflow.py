@@ -91,18 +91,44 @@ class Cashflow(db.Model, BaseMixin):
             if snapshot["outflow_with_interest"]
             else 0.0
         )
-        if "facility_interest" in snapshot:
-            financing_cost = round(
-                sum(snapshot["facility_interest"])
-                + sum(snapshot["facility_fees"]),
-                2,
-            )
-        else:
-            financing_cost = max(
-                0.0,
-                round(total_inflow - direct_cost - final_cash_balance, 2),
-            )
+
+        facility_rows = snapshot.get("facility_rows", [])
+        total_facility_interest = round(sum(snapshot.get("facility_interest", [])), 2)
+        total_facility_fees = round(sum(snapshot.get("facility_fees", [])), 2)
+        financing_cost = round(total_facility_interest + total_facility_fees, 2)
         total_cost = round(direct_cost + financing_cost, 2)
+
+        pre_finance = snapshot.get("pre_financing_balance")
+        if pre_finance is None:
+            running = 0.0
+            pre_finance = []
+            for value in snapshot.get("netflow", []):
+                running += float(value or 0)
+                pre_finance.append(round(running, 2))
+        lowest_balance = min(pre_finance, default=0.0)
+        lowest_period = pre_finance.index(lowest_balance) if pre_finance else None
+
+        combined_outstanding = []
+        if facility_rows:
+            horizon = max(
+                (len(row.get("outstanding", [])) for row in facility_rows),
+                default=0,
+            )
+            for period in range(horizon):
+                combined_outstanding.append(sum(
+                    float(row.get("outstanding", [])[period])
+                    if period < len(row.get("outstanding", []))
+                    else 0.0
+                    for row in facility_rows
+                ))
+        peak_facility_outstanding = max(combined_outstanding, default=0.0)
+        final_facility_outstanding = (
+            combined_outstanding[-1] if combined_outstanding else 0.0
+        )
+        cash_after_debt_settlement = (
+            float(final_cash_balance) - final_facility_outstanding
+        )
+
         summary = {
             "total_inflow": round(total_inflow, 2),
             "work_cost": round(work_cost, 2),
@@ -112,31 +138,32 @@ class Cashflow(db.Model, BaseMixin):
             "direct_cost": round(direct_cost, 2),
             "financing_cost": financing_cost,
             "total_cost": total_cost,
+            "total_facility_interest": total_facility_interest,
+            "total_facility_fees": total_facility_fees,
+            "minimum_pre_financing_balance": round(lowest_balance, 2),
+            "minimum_pre_financing_period": lowest_period,
+            "peak_pre_financing_need": round(max(0.0, -lowest_balance), 2),
+            "peak_pre_financing_period": lowest_period,
+            "peak_facility_outstanding": round(peak_facility_outstanding, 2),
+            "final_facility_outstanding": round(final_facility_outstanding, 2),
             "final_cash_balance": round(final_cash_balance, 2),
+            "cash_after_debt_settlement": round(cash_after_debt_settlement, 2),
             "work_duration": snapshot["duration"],
             "dlp": self.dlp or 0,
             "financial_horizon": len(snapshot["outflow_with_interest"]),
         }
-        if "facility_rows" in snapshot:
-            pre_finance = snapshot["pre_financing_balance"]
-            lowest_balance = min(pre_finance, default=0.0)
-            unfunded = snapshot["unfunded_shortfall"]
+        if facility_rows:
+            unfunded = snapshot.get("unfunded_shortfall", [])
             summary.update({
-                "peak_pre_financing_need": round(max(0.0, -lowest_balance), 2),
-                "peak_pre_financing_period": (
-                    pre_finance.index(lowest_balance) if pre_finance else None
-                ),
                 "contractor_contribution": round(sum(
                     sum(row["draw"])
-                    for row in snapshot["facility_rows"]
-                    if row["type"].casefold() in {"owner's injection", "contractor contribution"}
+                    for row in facility_rows
+                    if row["type"].casefold() in {
+                        "owner's injection",
+                        "contractor contribution",
+                    }
                 ), 2),
-                "total_facility_interest": round(sum(snapshot["facility_interest"]), 2),
-                "total_facility_fees": round(sum(snapshot["facility_fees"]), 2),
                 "peak_unfunded_shortfall": round(max(unfunded, default=0.0), 2),
-                "unfunded_draw_total": round(sum(
-                    sum(row["unfunded_draw"]) for row in snapshot["facility_rows"]
-                ), 2),
             })
 
         data = super().as_dict()
