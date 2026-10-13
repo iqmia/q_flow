@@ -17,12 +17,17 @@ from math import exp
 from re import sub
 
 import click
-from q_flow.models.activity import Activity
+from q_flow.models.activity import (
+    Activity,
+    effective_activity_mode,
+    effective_distribution_type,
+)
 from matplotlib import pyplot as plt
 from asciichartpy import plot
 from prettytable import PrettyTable
 
 from q_flow.models.cashflow import Cashflow
+
 
 class Work():
     def __init__(self, d, s, c, ct="s") -> None:
@@ -75,7 +80,7 @@ class Work():
         m_work = []
         t_work = self.__raw_cumulative_work()
         for t in range(0, self.d):
-            if t <=  self.d:
+            if t <= self.d:
                 m_work.append(t_work[t+1] - t_work[t])
 
         # calculate the error
@@ -98,7 +103,7 @@ class Work():
 
     def cumulative_work(self) -> list:
         '''
-        this method uses the error adjusted marginal work to create a new 
+        this method uses the error adjusted marginal work to create a new
         cumulative S curve.
         '''
         d = self.d
@@ -108,9 +113,12 @@ class Work():
             t_work.append(mWork[t] + t_work[t-1])
         return t_work
 
+
 class CashflowCalculator():
     def __init__(self, project: Cashflow) -> None:
         self.project = project
+        # Work is intentionally limited to physical/work activities. Outflow
+        # includes every activity, including scheduled costs.
         self.work_cf = []
         self.outflow_cf = []
         self.activity_cashflows = {}
@@ -121,7 +129,8 @@ class CashflowCalculator():
             activity_cf = Activity_cf(activity)
             activity_work = activity_cf.marginal_work_as_json()["marginal_work"]
             activity_outflow = activity_cf.out_flow_as_json()["marginal_out_flow"]
-            self.work_cf.append(activity_work)
+            if effective_activity_mode(activity) == "work":
+                self.work_cf.append(activity_work)
             self.outflow_cf.append(activity_outflow)
             self.activity_cashflows[activity.id] = {
                 "marginal_work": self._round_flow(activity_work),
@@ -129,7 +138,10 @@ class CashflowCalculator():
             }
 
         self.duration = max((len(work) for work in self.work_cf), default=0)
-        self.cost = sum(sum(work) for work in self.work_cf)
+        self.work_cost = sum(sum(work) for work in self.work_cf)
+        # Compatibility alias: historically calculator.cost was the denominator
+        # used to scale activity-linked work to contract value.
+        self.cost = self.work_cost
 
     @staticmethod
     def _round_flow(flow: list) -> list:
@@ -141,17 +153,17 @@ class CashflowCalculator():
             *self.work_cf, fillvalue=0)]
 
     def factored_work(self) -> list:
-        """Scale the combined activity work to the contract value."""
+        """Scale work-activity cost to the contract value."""
         t_work = self.workflow()
         if not t_work:
             return []
-        if self.cost == 0:
+        if self.work_cost == 0:
             return [0.0 for _ in t_work]
-        factor = self.project.contract_value / self.cost
+        factor = self.project.contract_value / self.work_cost
         return [value * factor for value in t_work]
 
     def independent_contract_work(self) -> list:
-        """Generate contract-value work independently over activity duration."""
+        """Generate contract-value work independently over work duration."""
         if not self.work_cf or self.duration <= 0:
             return []
 
@@ -276,12 +288,16 @@ class CashflowCalculator():
         return [value * payment_factor for value in billed_work]
 
     def outflow(self) -> list:
-        """Sum current activity outflows by period."""
+        """Sum all current activity outflows by period."""
         return [sum(values) for values in zip_longest(
             *self.outflow_cf, fillvalue=0)]
 
     def snapshot(self) -> dict:
-        if not self.work_cf:
+        workflow = self.workflow()
+        inflow = self.inflow()
+        outflow = self.outflow()
+
+        if not workflow and not outflow:
             empty_snapshot = {
                 "workflow": [],
                 "inflow": [],
@@ -294,9 +310,6 @@ class CashflowCalculator():
                 return self._apply_facilities(empty_snapshot)
             return empty_snapshot
 
-        workflow = self.workflow()
-        inflow = self.inflow()
-        outflow = self.outflow()
         netflow = [
             incoming - outgoing
             for incoming, outgoing in zip_longest(
@@ -378,7 +391,7 @@ class CashflowCalculator():
         table.add_row(["Interest Rate", self.project.interest_rate])
         table.add_row(["Contract Value", self.project.contract_value])
         table.add_row(["WIEB", self.project.wieb])
-        table.add_row(["Cost", self.cost])
+        table.add_row(["Work Cost", self.work_cost])
         table.align = "l"
         click.echo(table)
 
@@ -399,61 +412,52 @@ class CashflowCalculator():
 # Compatibility for older integrations while callers move to the clearer name.
 Project_cf = CashflowCalculator
 
+
 class Activity_cf():
     '''
     Given an Activity Object, this class will generate the cashflow for the
-    activity. It will generate the following cashflow's:
-    1. Marginal Work
-    2. Cumulative Work
-    3. Subcontractor Bill Work
-    4. Subcontractor Payments
-    5. Non Subcontractor Payments
-    6. Outflow
-
-    Definition of terms:
-    
-    no_billing_period: This variable specifies the number of periods for which
-    the subcontractor will not issue invoices. After this period concludes,
-    the subcontractor will bill for all work completed during this time. It’s
-    important to set this period accurately; if it’s shorter than the no work
-    period (mobilization period), it will not affect billing because no billable
-    work occurs during the mobilization period.
-
-    no_work_period (previously mobilization period): This period is when the 
-    subcontractor prepares for the main work but does not perform any billable 
-    activities on site. Therefore, no invoices are issued during this time. 
-    If the contract includes an advance payment, it will be provided at the 
-    beginning of this period. The actual billable work begins after the no work 
-    period ends.
-
-    duration_for_payment: This is the timeframe within which the subcontractor 
-    is paid after issuing an invoice. It is crucial for managing cash flow and
-    payment expectations.
-
-    start: This is the commencement date of the subcontractor’s activities, 
-    marking the beginning of the no work period. Billable work will only begin 
-    once this period is over, so it’s essential that this date is set with 
-    precision to ensure accurate scheduling and billing.
+    activity. Work activities may use a generated S-curve, generated linear
+    curve, or a manual dense marginal schedule. Scheduled-cost activities
+    produce direct outflow without creating physical/billable work.
     '''
     def __init__(self, activity: Activity) -> None:
         self.activity = activity
-        if activity.activity_type == "linear":
-            self.work = Work(
-                self.activity.duration, self.activity.skew, self.activity.cost, "l")
-        else:
-            self.work = Work(
-                self.activity.duration, self.activity.skew, self.activity.cost)
-        self.marginal_work = self.work.marginal_work()
+        self.activity_mode = effective_activity_mode(activity)
+        self.distribution_type = effective_distribution_type(activity)
+        self.work = None
 
-        # add 0's for mobilization period
+        if self.activity_mode == "scheduled_cost":
+            schedule = self.activity.cost_schedule_json or []
+            self.marginal_work = [0.0 for _ in schedule]
+            return
+
+        if self.distribution_type == "manual":
+            self.marginal_work = [
+                float(value) for value in (self.activity.cost_schedule_json or [])
+            ]
+        else:
+            work_type = "l" if self.distribution_type == "linear" else "s"
+            self.work = Work(
+                self.activity.duration,
+                self.activity.skew,
+                self.activity.cost,
+                work_type,
+            )
+            self.marginal_work = self.work.marginal_work()
+
+        # Pre-work/no-work periods are part of the existing work pipeline and
+        # therefore apply equally to generated and manual work distributions.
         for _ in range(0, self.activity.mobilization_period):
-            self.marginal_work.insert(0, 0)
+            self.marginal_work.insert(0, 0.0)
 
     def subcontractor_bill_work(self) -> list:
         '''
         From the marginal work, this method calculates the work that will be
         billed by the subcontractor. result is marginal
         '''
+        if self.activity_mode != "work":
+            return []
+
         sub_bill_work = []
         m_work = self.marginal_work
         no_work = self.activity.mobilization_period
@@ -503,6 +507,9 @@ class Activity_cf():
         Having the subcontractor bill work, this method calculates the payments
         that will be made to the subcontractor. result is marginal.
         '''
+        if self.activity_mode != "work":
+            return []
+
         sub_payments = []
         sub_bill_work = self.subcontractor_bill_work()
 
@@ -517,7 +524,7 @@ class Activity_cf():
         # add advance payment
         sub_payments[0] = sub_payments[0] + self.activity.advance * self.activity.cost * self.activity.subcontracted
 
-        # return 50% of retention
+        # return first portion of retention
         value_of_retention = self.activity.cost * self.activity.subcontracted * \
             self.activity.retention
         sub_payments[-1] += value_of_retention * self.activity.release_retention_eop
@@ -541,33 +548,32 @@ class Activity_cf():
         this method uses the marginal work list to calculate the payments that
         will be made to the non subcontractors. result is marginal.
         '''
+        if self.activity_mode != "work":
+            return []
+
         non_sub_payments = []
         m_work = self.marginal_work
-        # add zero to period 1 --- removed
-        # non_sub_payments.append(0)
-        # pay all bills
+        # pay all self-performed/direct cost as incurred
         for t in range(0, len(m_work)):
             non_sub_payments.append(m_work[t] * (1-self.activity.subcontracted))
 
         return non_sub_payments
 
     def out_flow(self) -> list:
-        '''
-        this method calculates the total outflow for the activity. It sums the
-        subcontractor payments and the non subcontractor payments. result is
-        marginal.
-        '''
+        '''Return marginal activity outflow before the project start offset.'''
+        if self.activity_mode == "scheduled_cost":
+            return [
+                float(value) for value in (self.activity.cost_schedule_json or [])
+            ]
+
         sub_payments = self.sub_payments()
         non_sub_payments = self.non_sub_payments()
-        outflow = [sum(n) for n in zip_longest(
+        return [sum(n) for n in zip_longest(
             sub_payments, non_sub_payments, fillvalue=0)]
-        return outflow
 
     def marginal_work_as_json(self):
         # adjust for start
-        m_work = [] 
-        for _ in range(0, self.activity.start):
-            m_work.insert(0, 0.0)
+        m_work = [0.0 for _ in range(0, self.activity.start)]
         m_work.extend(self.marginal_work)
         return {
             "marginal_work": m_work,
@@ -575,9 +581,7 @@ class Activity_cf():
 
     def out_flow_as_json(self):
         # adjust for start
-        out = []
-        for _ in range(0, self.activity.start):
-            out.insert(0, 0.0)
+        out = [0.0 for _ in range(0, self.activity.start)]
         out.extend(self.out_flow())
         return {
             "marginal_out_flow": out,
@@ -595,8 +599,12 @@ class Activity_cf():
 
     def printCashFlow(self, with_chart=False, with_text_chart=False, detailed=False):
         cf = self
-        wr = cf.work.marginal_work()
-        cw = cf.work.cumulative_work()
+        wr = list(cf.marginal_work)
+        cw = []
+        running = 0.0
+        for value in wr:
+            running += value
+            cw.append(running)
         sub = cf.subcontractor_bill_work()
         sub_pay = cf.sub_payments()
         non_sub = cf.non_sub_payments()
@@ -613,10 +621,9 @@ class Activity_cf():
         sum_sub_pay = click.style(str("%0.2f" % round(sum(sub_pay), 2)), fg="blue")
         sum_out = click.style(str("%0.2f" % round(sum(out), 2)), fg="blue")
         sum_non_sub = click.style(str("%0.2f" % round(sum(non_sub), 2)), fg="blue")
-        total_length = max([len(wr), len(cw), len(out), len(sub), len(sub_pay)])
+        total_length = max([len(wr), len(cw), len(out), len(sub), len(sub_pay)], default=0)
         for m in range(total_length):
             month = m+1
-            # Always show two decimal places for value
             value = "%0.2f" % round(wr[m], 2) if m < len(wr) else ""
             outflow = "%0.2f" % round(out[m], 2) if m < len(out) else ""
 
@@ -643,8 +650,7 @@ class Activity_cf():
                 table.add_row(
                     [month, value, type, cum, sw, sp, non_s_pay, outflow],
                     divider=(True if m == total_length - 1 else False)
-                    )
-
+                )
             else:
                 table.add_row([month, value, outflow], divider=(
                     True if m == total_length - 1 else False))
@@ -655,30 +661,25 @@ class Activity_cf():
         else:
             table.add_row(["Total", sum_wr, sum_out])
         click.echo(table)
-        
+
         if with_chart:
-            # create a a line plot x-axis is month and y-axis is outflow
             fig, ax = plt.subplots(facecolor="black")
             ax.set_facecolor("black")
             ax.bar(range(1, len(out)+1), out, color="green", align="center", alpha=0.5)
             ax.set_xlabel("Month", color="green")
             ax.set_ylabel("Outflow", color="green")
             ax.set_title("Outflow", color="green")
-            # Set the text color of labels to white
             for text in ax.texts:
                 text.set_color('white')
             ax.tick_params(axis='both', colors='white')
             plt.show()
-        
+
         if with_text_chart:
             data = [out]
             p = plot(data, cfg={'height': 20})
             click.echo(p)
-            
-            # plot the cumulative for the outflow
             p = plot([cum_out], cfg={'height': 20})
             click.echo(p)
-            # click.echo(wr)
 
     def printActivity(self):
         click.echo(click.style("\n\n**** Activity Parameters (red == not specified) ****", fg="blue"))
@@ -688,6 +689,8 @@ class Activity_cf():
         table.add_row(["Start", self.activity.start])
         table.add_row(["Duration", self.activity.duration])
         table.add_row(["Cost", self.activity.cost])
+        table.add_row(["Mode", self.activity_mode])
+        table.add_row(["Distribution", self.distribution_type])
         table.add_row(["Skew", self.activity.skew])
         table.add_row(["Subcontracted", self.activity.subcontracted])
         table.add_row(["Advance", self.activity.advance])
