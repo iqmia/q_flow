@@ -20,7 +20,6 @@ class ActivityType(Enum):
     LANDSCAPE = ("Landscape", 0)
     INFRASTRUCTURE = ("Infrastructure", -0.8)
     OTHER = ("Other", 0)
-    LINEAR = ("Linear", 0)
 
     def __str__(self):
         return self.code
