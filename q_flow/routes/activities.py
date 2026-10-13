@@ -37,8 +37,7 @@ _FRACTION_FIELDS = (
     "work_in_excess",
     "subcontracted",
 )
-_NON_NEGATIVE_INTEGER_FIELDS = (
-    "start",
+_WORK_NON_NEGATIVE_INTEGER_FIELDS = (
     "dlp",
     "duration_for_payment",
     "mobilization_period",
@@ -60,12 +59,14 @@ def _is_finite_number(value):
 
 
 def _validate_activity(activity):
+    mode = effective_activity_mode(activity)
+    distribution = effective_distribution_type(activity)
     InvalidData.require_condition(
-        effective_activity_mode(activity) in ACTIVITY_MODES,
+        mode in ACTIVITY_MODES,
         "Activity mode must be work or scheduled_cost",
     )
     InvalidData.require_condition(
-        effective_distribution_type(activity) in DISTRIBUTION_TYPES,
+        distribution in DISTRIBUTION_TYPES,
         "Activity distribution_type must be s_curve, linear, or manual",
     )
     InvalidData.require_condition(
@@ -79,11 +80,21 @@ def _validate_activity(activity):
         "Activity duration must be an integer greater than zero",
     )
     InvalidData.require_condition(
+        isinstance(activity.start, int)
+        and not isinstance(activity.start, bool)
+        and activity.start >= 0,
+        "Activity start must be a non-negative integer",
+    )
+
+    if mode == "scheduled_cost":
+        return
+
+    InvalidData.require_condition(
         _is_finite_number(activity.skew) and -1 < activity.skew < 1,
         "Activity skew must be greater than -1 and less than 1",
     )
 
-    for field in _NON_NEGATIVE_INTEGER_FIELDS:
+    for field in _WORK_NON_NEGATIVE_INTEGER_FIELDS:
         value = getattr(activity, field)
         InvalidData.require_condition(
             isinstance(value, int)
