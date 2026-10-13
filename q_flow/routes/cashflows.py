@@ -8,7 +8,12 @@ from sqlalchemy import func
 from q_flow.exceptions import InvalidData, MissingData, ProjectNotDeleted, ProjectNotFound
 from q_flow.financing import FACILITY_PRESETS, validate_financing_facilities
 from q_flow.extensions import db
-from q_flow.models.activity import Activity, ActivityType
+from q_flow.models.activity import (
+    Activity,
+    ActivityType,
+    effective_distribution_type,
+    normalize_activity,
+)
 from q_flow.models.cashflow import Cashflow
 from q_flow.routes.activities import (
     _set_cached_cashflow,
@@ -42,6 +47,9 @@ _CASHFLOW_IMPORT_FIELDS = {
 _ACTIVITY_IMPORT_FIELDS = {
     "name",
     "activity_type",
+    "activity_mode",
+    "distribution_type",
+    "cost_schedule_json",
     "cost",
     "duration",
     "duration_units",
@@ -264,18 +272,34 @@ def import_cashflow(user, unit_id):
             )
             _require_text(row, "name", "Activity name")
             _optional_text(row, "activity_type", "Activity type")
+            _optional_text(row, "activity_mode", "Activity mode")
+            _optional_text(row, "distribution_type", "Activity distribution type")
             _optional_text(row, "duration_units", "Activity duration units")
-            MissingData.require_condition(
-                "cost" in row and "duration" in row,
-                "Missing activity cost or duration",
+
+            raw_mode = row.get("activity_mode") or "work"
+            raw_distribution = row.get("distribution_type")
+            uses_schedule = (
+                raw_mode == "scheduled_cost" or raw_distribution == "manual"
             )
+            if not uses_schedule:
+                MissingData.require_condition(
+                    "cost" in row and "duration" in row,
+                    "Missing activity cost or duration",
+                )
 
             activity_data = _filtered(row, _ACTIVITY_IMPORT_FIELDS)
             activity = Activity().from_dict(activity_data, user_id)
             activity.cashflow_id = cashflow.id
             activity.is_deleted = False
+
+            # Normalize before scalar defaults so old version-1 rows with
+            # activity_type='linear' retain their legacy linear behavior.
+            normalize_activity(activity)
             _set_activity_scalar_defaults(activity)
-            if "skew" not in activity_data or activity.skew is None:
+            if (
+                effective_distribution_type(activity) == "s_curve"
+                and ("skew" not in activity_data or activity.skew is None)
+            ):
                 activity.skew = ActivityType.skew_by_code(activity.activity_type)
             _validate_activity(activity)
             _set_cached_cashflow(activity)
