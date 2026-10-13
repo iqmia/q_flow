@@ -130,8 +130,6 @@ def test_null_curve_type_falls_back_to_activity_linked_contract_work(app):
             start=2,
             use_independent_inflow_curve=True,
         )
-        # Existing rows gain nullable schema columns without a data backfill.
-        # Model that real post-upgrade state after the row has been inserted.
         cashflow.inflow_curve_type = None
         calculator = CashflowCalculator(cashflow)
 
@@ -314,6 +312,7 @@ def test_cashflow_rejects_advance_plus_retention_above_contract_value():
 
 def test_activity_rejects_advance_plus_retention_above_subcontract_value():
     activity = SimpleNamespace(
+        activity_type="linear",
         cost=100,
         duration=1,
         skew=0,
@@ -326,8 +325,6 @@ def test_activity_rejects_advance_plus_retention_above_subcontract_value():
         retention=0.5,
         release_retention_eop=0.5,
         work_in_excess=0.2,
-        mobilization=0,
-        profit=0,
         subcontracted=1,
     )
 
