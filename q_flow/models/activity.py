@@ -1,9 +1,15 @@
-
 from enum import Enum
-from typing_extensions import deprecated
+from math import isfinite
+
+from q_flow.exceptions import InvalidData
 from q_flow.extensions import db
 from q_flow.models.mixins import BaseMixin
 from sqlalchemy.orm import synonym
+
+
+ACTIVITY_MODES = {"work", "scheduled_cost"}
+DISTRIBUTION_TYPES = {"s_curve", "linear", "manual"}
+
 
 class ActivityType(Enum):
     GENERAL = ("General", 0)
@@ -39,6 +45,80 @@ class ActivityType(Enum):
         return 0
 
 
+def effective_activity_mode(activity) -> str:
+    """Return the calculation mode while preserving legacy nullable rows."""
+    return activity.activity_mode or "work"
+
+
+def effective_distribution_type(activity) -> str:
+    """Return the calculation distribution for new and legacy activities."""
+    if effective_activity_mode(activity) == "scheduled_cost":
+        return "manual"
+    if activity.distribution_type:
+        return activity.distribution_type
+    if str(activity.activity_type or "").casefold() == "linear":
+        return "linear"
+    return "s_curve"
+
+
+def _normalized_schedule(schedule):
+    InvalidData.require_condition(
+        isinstance(schedule, list) and len(schedule) > 0,
+        "Activity cost schedule must be a non-empty list",
+    )
+    normalized = []
+    for value in schedule:
+        InvalidData.require_condition(
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and isfinite(value)
+            and value >= 0,
+            "Activity cost schedule values must be finite non-negative numbers",
+        )
+        normalized.append(float(value))
+    InvalidData.require_condition(
+        sum(normalized) > 0,
+        "Activity cost schedule total must be greater than zero",
+    )
+    return normalized
+
+
+def normalize_activity(activity):
+    """Normalize calculation source fields before validation/calculation.
+
+    Existing rows added before activity modes may keep the new columns NULL.
+    Legacy ``activity_type='linear'`` therefore still infers a linear work
+    distribution until the row is explicitly saved with the new fields.
+    """
+    mode = effective_activity_mode(activity)
+    InvalidData.require_condition(
+        mode in ACTIVITY_MODES,
+        "Activity mode must be work or scheduled_cost",
+    )
+
+    distribution = effective_distribution_type(activity)
+    InvalidData.require_condition(
+        distribution in DISTRIBUTION_TYPES,
+        "Activity distribution_type must be s_curve, linear, or manual",
+    )
+
+    activity.activity_mode = mode
+    activity.distribution_type = (
+        "manual" if mode == "scheduled_cost" else distribution
+    )
+
+    uses_schedule = (
+        mode == "scheduled_cost" or activity.distribution_type == "manual"
+    )
+    if uses_schedule:
+        schedule = _normalized_schedule(activity.cost_schedule_json)
+        activity.cost_schedule_json = schedule
+        activity.cost = sum(schedule)
+        activity.duration = len(schedule)
+
+    return activity
+
+
 class Activity(db.Model, BaseMixin):
     name = db.Column(db.String(64))
     cash_flow_json = db.Column(db.JSON)
@@ -48,7 +128,7 @@ class Activity(db.Model, BaseMixin):
         db.String(64),
         db.ForeignKey('project.id'),
         nullable=False,
-        )
+    )
     project_id = synonym('cashflow_id')
 
     def as_dict(self):
@@ -56,78 +136,60 @@ class Activity(db.Model, BaseMixin):
         data['cashflow_id'] = data.pop('project_id')
         return data
 
-    # The type of activity. e.g. Structure, MEP, Facade, etc.
+    # Creation-time template/category such as Structure, MEP, Facade, etc.
     activity_type = db.Column(db.String(64), default=ActivityType.GENERAL.code)
 
-    # The total selling cost of the activity.
+    # Calculation semantics. Columns remain nullable for legacy rows created
+    # before this schema existed; helpers above provide runtime compatibility.
+    activity_mode = db.Column(db.String(32), nullable=True, default="work")
+    distribution_type = db.Column(db.String(32), nullable=True, default="s_curve")
+    cost_schedule_json = db.Column(db.JSON, nullable=True)
+
+    # Contractor's estimated cost of the activity. For manual work and
+    # scheduled cost this is derived from cost_schedule_json.
     cost = db.Column(db.Float, default=0.0)
 
     # Duration Units
     duration_units = db.Column(db.String(64), default="Months")
 
-    # time to complete the project
+    # Time to complete the activity. For manual work and scheduled cost this
+    # is derived from the dense schedule length.
     duration = db.Column(db.Integer, default=4)
 
     # A time after the start of the project where the activity starts.
     # zero means the activity starts at the start of the project.
     start = db.Column(db.Integer, default=0)
 
-    # A percentage of the Project Cost issued to the contractor prior to the start of work.
+    # A percentage of the activity cost issued to the subcontractor prior to
+    # the start of work.
     advance = db.Column(db.Float, default=0.1)
 
-    # The percent deduction applied to each invoice issued by the contractor and
-    # repaid partially at the end of the project. The second part is repaid at
-    # the end of the defect liability period (dlp).
+    # The percent deduction applied to each subcontract invoice and released
+    # at the end of progress / DLP according to release_retention_eop.
     retention = db.Column(db.Float, default=0.1)
 
-    # The percentage of the contract value retained by the client until the
-    # completion of the project. the remaining amount is paid at the end of the
-    # project. (eop) the remaining acount (1-eop) is paid at the end of the dlp.
+    # Fraction of subcontract retention released at the first release point.
     release_retention_eop = db.Column(db.Float, default=0.5)
 
-    # The period of time after the completion of the project during which the
-    # contractor is liable for any defects in the work.
+    # Defects liability period between first and final retention releases.
     dlp = db.Column(db.Integer, default=0)
 
-    # The period required to process the contractor's invoice and issue payment.
+    # Period required to process a subcontract invoice and issue payment.
     duration_for_payment = db.Column(db.Integer, default=1)
 
-    # The percentage of work completed in excess of the billed amount.
+    # Percentage of subcontract work carried into the following billing period.
     work_in_excess = db.Column(db.Float, default=0.1)
 
-    # Percentage of the project cost required at the start for mobilization,
-    # equipment, materials and advances to subcontractors.
-    mobilization = db.Column(db.Float, default=0.01)
-
-    # The period of mobilization. The mobilization cost is distributed over
-    # this period in addition total cost of  the activity.
+    # Legacy name retained because the calculation actively uses this as the
+    # initial pre-work/no-work period.
     mobilization_period = db.Column(db.Integer, default=1)
 
-    # Percent profit on the project.
-    profit = db.Column(db.Float, default=0.1)
-
-    # percent subcontracted
+    # Percent subcontracted.
     subcontracted = db.Column(db.Float, default=0.7)
 
-    # subcontractors' retention
-    # deprecated, use retention instead
-    subcontractors_retention = db.Column(db.Float, default=0.1)
-
-    # Interest Rate per period
-    # deprecated
-    interest_rate = db.Column(db.Float, default=0.005)
-    
-    # compounding period
-    # if the duration is in months, then the compounding period is in months
-    # then the default default compounding_period = 1 is monthly
-    # to change it to years, compounding_period = 12
-    # to change it to semi-annually, compounding_period = 6
-    # deprecated
-    compounding_period = db.Column(db.Integer, default=1)
-    
-    # skew,  Skewing factor between -0.9 and +0.9
+    # Skewing factor between -1 and +1 for generated S-curves.
     skew = db.Column(db.Float, default=0.0)
 
-    # no billing period. This is the period of time after the start of the
-    # activity during which no billing is issued.
+    # Initial subcontract billing window during which work accumulates before
+    # the first bill is issued.
     no_billing_period = db.Column(db.Integer, default=0)
