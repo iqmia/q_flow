@@ -1,6 +1,6 @@
 # CashflowPot portable cash-flow JSON
 
-This document defines the current portable JSON format used to export and import a CashflowPot cash-flow scenario.
+This document defines the portable JSON format used to export and import a CashflowPot cash-flow scenario.
 
 The portable file is an **input model**, not a serialized API response. It is intended for backup/transfer and is also the natural structured target for future AI-assisted scenario generation.
 
@@ -38,11 +38,11 @@ Timing values are integer model **periods**. The portable format does not assume
 Important validation rules include:
 
 - project/client `advance + retention <= 1.0`;
-- Activity/subcontract `advance + retention <= 1.0`;
+- Work Activity/subcontract `advance + retention <= 1.0`;
 - Activity `skew` strictly inside `(-1, 1)`;
 - non-null `inflow_curve_skew` strictly inside `(-1, 1)`;
-- Activity cost > 0;
-- Activity duration > 0;
+- generated Work Activity cost > 0 and duration > 0;
+- Manual Work and Scheduled Cost require a non-empty `cost_schedule_json` with finite non-negative values and a total > 0;
 - payment period, DLP, start, pre-work, and no-billing period are non-negative integers.
 
 ## 3. Cash-flow object
@@ -64,22 +64,7 @@ Example:
   "use_independent_inflow_curve": true,
   "inflow_curve_type": "s_curve",
   "inflow_curve_skew": 0.0,
-  "financing_facilities": [
-    {
-      "id": "od-1",
-      "name": "Project overdraft",
-      "type": "Overdraft",
-      "draw_method": "automatic_shortfall",
-      "repayment_method": "cashflow_sweep",
-      "start": 0,
-      "end": 12,
-      "limit": 200000,
-      "fees": 500,
-      "interest_rate": 0.01,
-      "revolving": true,
-      "sweep_priority": 0
-    }
-  ],
+  "financing_facilities": [],
   "activities": []
 }
 ```
@@ -104,13 +89,7 @@ financing_facilities
 activities
 ```
 
-`financing_facilities` is optional for older version-1 files. Each facility is
-an editable input model. Scheduled draws and repayments use period-to-amount
-maps; PPC discounts use `advance_portion`; PPC repayments use
-`repayment_percent`; equal installments use `installment_start`,
-`installment_interval`, and `installment_count`. A scheduled facility draw is
-capped at available capacity, with the undrawn amount reported in the
-calculated snapshot.
+`financing_facilities` is optional for older version-1 files. Scheduled facility draws and repayments continue to use the facility period-to-amount map representation. Activity schedules use the separate dense-list representation documented below.
 
 `name` must be non-empty text. `description`, when present, must be text.
 
@@ -135,36 +114,29 @@ linear
 
 A null `inflow_curve_skew` is interpreted as balanced `0.0`. It does not disable Independent inflow. Skew is retained but has no calculation effect for a Linear curve.
 
-The three Independent-inflow fields are optional for Version 1 compatibility.
-
-If they are omitted when importing a **new** scenario, current backend scalar defaults are applied:
-
-```text
-use_independent_inflow_curve = true
-inflow_curve_type            = s_curve
-inflow_curve_skew            = 0.0
-```
-
-This differs from legacy database rows created before these columns existed: those stored rows may retain null values and therefore remain Activity-linked until explicitly changed.
+The three Independent-inflow fields are optional for Version 1 compatibility. When omitted for a newly imported scenario, current scalar defaults are applied.
 
 ## 5. Work in Excess of Billings (WIEB)
 
-`wieb` is the project-level Work in Excess of Billings (WIEB) forecasting assumption.
+`wieb` is the project-level Work in Excess of Billings forecasting assumption. It represents the estimated share of completed contract-value work that is not billed in the current period and is carried into the following billing period.
 
-It represents the estimated share of completed contract-value work that is not billed in the current period and is carried into the following billing period.
+Activity `work_in_excess` is the equivalent subcontract-side timing assumption for Work Activities. Scheduled Cost does not use WIEB.
 
-Actual WIEB is an amount/value; the portable file stores the percentage assumption used by CashflowPot.
-
-WIEB changes timing, not lifetime project value.
+WIEB changes timing, not lifetime value.
 
 ## 6. Activity object
 
-Example:
+Activities separate **category/template**, **calculation mode**, and **work distribution**.
+
+### 6.1 Generated Work Activity
 
 ```json
 {
   "name": "Concrete works",
   "activity_type": "concrete",
+  "activity_mode": "work",
+  "distribution_type": "s_curve",
+  "cost_schedule_json": null,
   "cost": 400000,
   "duration": 4,
   "duration_units": "Periods",
@@ -182,11 +154,91 @@ Example:
 }
 ```
 
-Current accepted Activity input fields are:
+`activity_type` is a template/category only. It no longer selects the calculation method.
+
+`activity_mode` accepts:
+
+```text
+work
+scheduled_cost
+```
+
+For `activity_mode = work`, `distribution_type` accepts:
+
+```text
+s_curve
+linear
+manual
+```
+
+Generated `s_curve` and `linear` Work Activities use `cost` and `duration` and do not require a schedule.
+
+### 6.2 Manual Work Activity
+
+```json
+{
+  "name": "Manual MEP work",
+  "activity_type": "mep",
+  "activity_mode": "work",
+  "distribution_type": "manual",
+  "cost_schedule_json": [200, 0, 500, 300],
+  "start": 1,
+  "advance": 0.10,
+  "retention": 0.10,
+  "release_retention_eop": 0.50,
+  "dlp": 6,
+  "duration_for_payment": 1,
+  "work_in_excess": 0.10,
+  "mobilization_period": 0,
+  "subcontracted": 0.50,
+  "skew": 0,
+  "no_billing_period": 0
+}
+```
+
+`cost_schedule_json` is a **dense activity-local marginal list**. The example above means four local periods with values 200, 0, 500 and 300. `start` shifts the resulting series into project time.
+
+For Manual Work:
+
+```text
+cost     = sum(cost_schedule_json)
+duration = len(cost_schedule_json)
+```
+
+The backend derives those values from the schedule. The manual schedule replaces only the generated base work curve; the existing pre-work, subcontract share, no-billing, WIEB, advance, retention, payment-period and DLP logic then operates unchanged.
+
+### 6.3 Scheduled Cost Activity
+
+```json
+{
+  "name": "Elevator purchase",
+  "activity_type": "other",
+  "activity_mode": "scheduled_cost",
+  "distribution_type": "manual",
+  "cost_schedule_json": [0, 200000, 0, 500000],
+  "start": 0
+}
+```
+
+For Scheduled Cost:
+
+```text
+cost              = sum(cost_schedule_json)
+duration          = len(cost_schedule_json)
+marginal_work     = zero series
+marginal_out_flow = cost_schedule_json
+```
+
+Scheduled Cost affects project direct cost, outflow, net cash and financing need. It does **not** create physical work, client billed work/PPC, or project work duration. Subcontract terms are not applied to the schedule.
+
+### 6.4 Current accepted Activity source fields
 
 ```text
 name
 activity_type
+activity_mode
+distribution_type
+cost_schedule_json
 cost
 duration
 duration_units
@@ -203,13 +255,32 @@ skew
 no_billing_period
 ```
 
-`name` must be non-empty text. `cost` and `duration` are required.
+`name` must be non-empty text.
 
-`work_in_excess` is the subcontract-side Work in Excess of Billings (WIEB) assumption and applies only to the subcontracted share. Self-performed/direct cost is paid as incurred.
+`mobilization_period` is the legacy backend field currently used as the Activity **pre-work / no-work period** and remains active for Work Activities.
 
-`mobilization_period` is the legacy backend field currently used as the Activity **pre-work / no-work period**.
+## 7. Version-1 compatibility
 
-## 7. Deliberately excluded data
+The new Activity fields are optional for older Version 1 files.
+
+When they are absent:
+
+```text
+activity_mode = work
+```
+
+and distribution is inferred as:
+
+```text
+activity_type == "linear"  -> linear
+otherwise                  -> s_curve
+```
+
+This preserves old files that used `activity_type = "linear"` as the calculation switch while allowing new files to keep type/category and distribution independent.
+
+Do not silently change the meaning of an existing Version 1 field. If a future change cannot be made compatibly, introduce and document a new format version.
+
+## 8. Deliberately excluded data
 
 Portable files do not contain or trust server-owned identity or calculated output such as:
 
@@ -218,65 +289,50 @@ Portable files do not contain or trust server-owned identity or calculated outpu
 - creator/updater IDs or timestamps;
 - deleted-state flags;
 - calculated `workflow`, `inflow`, `outflow`, `netflow`, or cumulative financed-balance arrays;
-- cached Activity `cash_flow_json`;
-- deprecated/unused Activity fields such as `profit`, Activity financing/compounding fields, or legacy `subcontractors_retention`.
+- cached Activity `cash_flow_json`.
 
-Those values are server-owned, compatibility-only, or recalculated.
+The following removed legacy Activity inputs are also not portable source fields:
 
-The backend filters imported objects to the current allowed field set rather than trusting arbitrary extra keys.
+- `mobilization` percentage;
+- `profit`;
+- `subcontractors_retention`;
+- Activity-level `interest_rate`;
+- `compounding_period`.
 
-## 8. Current Flutter export/import behavior
+Existing upgraded database tables may physically retain old nullable columns, but the active ORM/API/client model does not use them.
 
-The Flutter client currently uses the same constants:
+## 9. Flutter export/import behavior
 
-```text
-format  = cashflowpot.cashflow
-version = 1
-```
-
-On export it writes the current scenario inputs and Activities using the fields above.
-
-The generated filename follows the pattern:
+The Flutter client uses the same Version 1 marker. On export it writes current scenario and Activity source inputs. A simple Activity schedule editor may display a dense schedule as user-facing pairs such as:
 
 ```text
-<safe-scenario-name>.cashflowpot.json
+1: 500, 4: 900
 ```
 
-On import, the Flutter client:
+but the stored/exported value remains:
 
-1. parses JSON;
-2. verifies format/version;
-3. validates the scenario fields;
-4. validates every Activity;
-5. creates an import preview containing the scenario name, Activity count, and contract value; and
-6. only then submits the payload to the backend import endpoint.
+```json
+[500, 0, 0, 900]
+```
 
-Client validation improves UX but is not authoritative.
+This keeps UI representation independent from the backend schema.
 
-## 9. Backend import behavior
+On import, Flutter parses and validates the scenario and every Activity before submitting the payload. Backend validation remains authoritative.
 
-The backend import endpoint validates the payload again.
+## 10. Backend import behavior
 
-Current behavior is:
+The backend import endpoint:
 
-1. require the Version 1 format marker;
-2. require a cash-flow object and Activity list;
-3. filter scenario and Activity data to supported fields;
-4. apply backend scalar defaults to omitted optional values;
-5. validate the scenario;
-6. validate every Activity;
-7. calculate the imported scenario snapshot; and
-8. commit the scenario and all Activities together only after the complete import is valid.
+1. requires the Version 1 format marker;
+2. requires a cash-flow object and Activity list;
+3. filters scenario and Activity data to supported fields;
+4. normalizes legacy/new Activity mode and distribution semantics;
+5. derives `cost` and `duration` from manual/scheduled schedules;
+6. validates the scenario and every Activity;
+7. calculates the imported scenario snapshot; and
+8. commits the scenario and all Activities together only after the complete import is valid.
 
 The import is transactional. Any validation or calculation failure rolls the new scenario back rather than leaving a partially imported Cashflow.
-
-## 10. Compatibility expectations for Version 1
-
-Version 1 is designed so older files that predate Independent inflow fields remain importable.
-
-Do not silently change the meaning of an existing Version 1 field. If a future change cannot be made compatibly, introduce and document a new format version.
-
-Do not serialize calculated arrays into the portable input model as a substitute for recalculation. The backend calculation engine remains authoritative.
 
 ## 11. Relationship to future AI-assisted setup
 
@@ -284,4 +340,4 @@ Future AI-assisted setup may generate this portable input structure as a proposa
 
 AI-generated values must still pass backend validation and be recalculated by the normal CashflowPot engine.
 
-Last reviewed against current q_flow backend and Flutter JSON codec: 7 October 2026.
+Last reviewed against current q_flow backend and Flutter JSON codec: 13 October 2026.
