@@ -52,6 +52,7 @@ class Cashflow(db.Model, BaseMixin):
 
     def as_dict_with_activities(self):
         from q_flow.cashflow import CashflowCalculator
+        from q_flow.models.activity import effective_activity_mode
 
         active_activities = [
             activity for activity in self.activities if not activity.is_deleted
@@ -68,6 +69,7 @@ class Cashflow(db.Model, BaseMixin):
         subcontracted_cost = sum(
             float(activity.cost or 0) * float(activity.subcontracted or 0)
             for activity in active_activities
+            if effective_activity_mode(activity) == "work"
         )
         self_performed_cost = direct_cost - subcontracted_cost
         total_inflow = round(sum(calculator.inflow()), 2) if active_activities else 0.0
