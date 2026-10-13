@@ -70,15 +70,30 @@ def _repayment_due(facility, period, installment_amount, ppc_base):
     return 0.0
 
 
+def _automatic_repayment_cap(facility, opening_outstanding, current_outstanding):
+    """Return principal eligible for automatic repayment in this period.
+
+    A scheduled draw becomes repayable only in the following period. Other draw
+    methods preserve their existing repayment behavior.
+    """
+    if facility.get("draw_method") == "scheduled" and facility.get(
+        "repayment_method"
+    ) in {"percent_of_ppc", "cashflow_sweep"}:
+        return max(0.0, opening_outstanding)
+    return max(0.0, current_outstanding)
+
+
 def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
     """Calculate facility flows while preserving the project's cash position.
 
-    Scheduled and PPC-linked draws are entered in full when eligible. They are
-    limited by available facility capacity. Contractual repayments are applied
-    in full up to outstanding principal, even when they make project cash
-    negative. Cashflow sweeps use only positive cash and follow sweep_priority.
-    Automatic shortfall draws run after contractual repayments: overdrafts first,
-    then owner/contractor contributions to cover the residual.
+    Scheduled and PPC-linked draws are requested facility inflows. Actual draws
+    are limited by available capacity. Explicit contractual repayments are
+    applied in full up to outstanding principal, even when they make project
+    cash negative. Automatic repayments on scheduled-draw facilities can repay
+    only principal outstanding at the opening of the period. Cashflow sweeps use
+    only positive cash and follow sweep_priority. Automatic shortfall draws run
+    after contractual repayments: overdrafts first, then owner/contractor
+    contributions to cover the residual.
     """
     facilities = [dict(facility) for facility in facilities]
     period_count = _period_count(inflows, outflows, ppc_base, ppc_issued, facilities)
@@ -126,7 +141,6 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
             "fees": [],
             "outstanding": [],
             "available_limit": [],
-            "unfunded_draw": [],
         })
 
     for period in range(period_count):
@@ -136,7 +150,6 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
         period_fees = [0.0] * len(facilities)
         period_draws = [0.0] * len(facilities)
         period_repayments = [0.0] * len(facilities)
-        period_unfunded_draw = [0.0] * len(facilities)
         opening_outstanding = [entry["outstanding"] for entry in state]
 
         # Accrue interest on each facility's opening principal. A facility drawn
@@ -153,8 +166,9 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
         cash_before_financing = cash_balance + project_inflow - project_outflow
         cash_balance = cash_before_financing - sum(period_interest) - sum(period_fees)
 
-        # Fixed schedule and PPC-base draws happen as planned. Capacity limits
-        # still apply; rejected portions are reported explicitly.
+        # Fixed schedule and PPC-base draws happen as requested while available
+        # facility capacity determines the actual inflow. Unavailable requested
+        # amounts have no cashflow effect and are not carried forward.
         for index, facility in enumerate(facilities):
             method = facility.get("draw_method", "scheduled")
             start = int(facility.get("start", 0))
@@ -175,14 +189,14 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
             )
             draw = min(requested, capacity)
             period_draws[index] += draw
-            period_unfunded_draw[index] += requested - draw
             state[index]["outstanding"] += draw
             state[index]["total_drawn"] += draw
             cash_balance += draw
 
         # Contractual repayments are not conditional on positive project cash.
         for index, facility in enumerate(facilities):
-            if facility.get("repayment_method") in (None, "cashflow_sweep"):
+            method = facility.get("repayment_method")
+            if method in (None, "cashflow_sweep"):
                 continue
             due = _repayment_due(
                 facility,
@@ -190,7 +204,14 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
                 facility["_equal_installment_amount"],
                 ppc_base,
             )
-            repayment = min(max(0.0, due), state[index]["outstanding"])
+            repayable_principal = state[index]["outstanding"]
+            if method == "percent_of_ppc":
+                repayable_principal = _automatic_repayment_cap(
+                    facility,
+                    opening_outstanding[index],
+                    state[index]["outstanding"],
+                )
+            repayment = min(max(0.0, due), repayable_principal)
             period_repayments[index] += repayment
             state[index]["outstanding"] -= repayment
             cash_balance -= repayment
@@ -208,7 +229,12 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
         for index in sweep_indices:
             if cash_balance <= 0:
                 break
-            repayment = min(cash_balance, state[index]["outstanding"])
+            repayable_principal = _automatic_repayment_cap(
+                facilities[index],
+                opening_outstanding[index],
+                state[index]["outstanding"],
+            )
+            repayment = min(cash_balance, repayable_principal)
             period_repayments[index] += repayment
             state[index]["outstanding"] -= repayment
             cash_balance -= repayment
@@ -255,7 +281,6 @@ def calculate_financing(*, inflows, outflows, ppc_base, ppc_issued, facilities):
             row["available_limit"].append(
                 None if capacity == float("inf") else round(capacity, 2)
             )
-            row["unfunded_draw"].append(round(period_unfunded_draw[index], 2))
 
         total_draw = sum(period_draws)
         total_repayment = sum(period_repayments)
