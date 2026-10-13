@@ -337,7 +337,7 @@ def test_scheduled_cost_only_snapshot_keeps_outflow_with_zero_work_duration(tmp_
         assert snapshot["outflow_with_interest"] == [0.0, -250.0]
 
 
-def test_activity_linked_inflow_scales_only_work_cost_and_summary_keeps_all_cost(tmp_path):
+def test_activity_linked_inflow_scales_only_work_cost_and_summary_keeps_cost_classes(tmp_path):
     app = _app(tmp_path)
     from q_flow.cashflow import CashflowCalculator
     from q_flow.models.activity import normalize_activity
@@ -368,5 +368,7 @@ def test_activity_linked_inflow_scales_only_work_cost_and_summary_keeps_all_cost
         assert calculator.workflow() == [300.0, 500.0]
         assert calculator.contract_work() == [450.0, 750.0]
         assert data["summary"]["direct_cost"] == 1000.0
+        assert data["summary"]["work_cost"] == 800.0
+        assert data["summary"]["scheduled_cost"] == 200.0
         assert data["summary"]["subcontracted_cost"] == 0.0
-        assert data["summary"]["self_performed_cost"] == 1000.0
+        assert data["summary"]["self_performed_cost"] == 800.0
