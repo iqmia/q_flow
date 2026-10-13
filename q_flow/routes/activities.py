@@ -13,7 +13,14 @@ from q_flow.exceptions import (
     ProjectNotFound,
 )
 from q_flow.extensions import db
-from q_flow.models.activity import Activity, ActivityType
+from q_flow.models.activity import (
+    ACTIVITY_MODES,
+    DISTRIBUTION_TYPES,
+    Activity,
+    ActivityType,
+    effective_distribution_type,
+    normalize_activity,
+)
 from q_flow.models.cashflow import Cashflow
 from q_flow.services.decorators import auth_required
 from q_flow.services.units import EDIT_CASHFLOW, VIEW_CASHFLOW, ensure_unit_permission
@@ -27,8 +34,6 @@ _FRACTION_FIELDS = (
     "retention",
     "release_retention_eop",
     "work_in_excess",
-    "mobilization",
-    "profit",
     "subcontracted",
 )
 _NON_NEGATIVE_INTEGER_FIELDS = (
@@ -54,6 +59,14 @@ def _is_finite_number(value):
 
 
 def _validate_activity(activity):
+    InvalidData.require_condition(
+        activity.activity_mode in ACTIVITY_MODES,
+        "Activity mode must be work or scheduled_cost",
+    )
+    InvalidData.require_condition(
+        activity.distribution_type in DISTRIBUTION_TYPES,
+        "Activity distribution_type must be s_curve, linear, or manual",
+    )
     InvalidData.require_condition(
         _is_finite_number(activity.cost) and activity.cost > 0,
         "Activity cost must be a finite number greater than zero",
@@ -126,8 +139,16 @@ def _set_cached_cashflow(activity):
 def _finalize_mutation(cashflow, activity=None, use_type_skew=False):
     try:
         if activity is not None:
+            # Normalize before applying scalar defaults so a legacy nullable
+            # activity_type='linear' row is inferred as linear, not overwritten
+            # by the new s_curve default.
+            normalize_activity(activity)
             _set_scalar_defaults(activity)
-            if use_type_skew and activity.skew in (None, 0):
+            if (
+                use_type_skew
+                and effective_distribution_type(activity) == "s_curve"
+                and activity.skew in (None, 0)
+            ):
                 activity.skew = ActivityType.skew_by_code(activity.activity_type)
             _validate_activity(activity)
             _set_cached_cashflow(activity)
@@ -166,10 +187,8 @@ def new_activity(user, cashflow_id):
     if error:
         return error
 
-    check_required(data, ["name", "cost", "duration"])
-    MissingData.require_condition(
-        data.get("name") and data.get("cost"), "Missing name or cost"
-    )
+    check_required(data, ["name"])
+    MissingData.require_condition(data.get("name"), "Missing activity name")
 
     activity = Activity()
     activity.cashflow_id = cashflow_id
@@ -216,7 +235,7 @@ def update_activity(user, activity_id):
     if error:
         return error
 
-    check_required(data, ["name", "cost", "duration"])
+    check_required(data, ["name"])
     _apply_activity_updates(activity, data, user.get("user_id"))
     snapshot = _finalize_mutation(
         activity.cashflow, activity=activity, use_type_skew=True
@@ -321,6 +340,8 @@ def restore_activities(user):
             activity.is_deleted = False
             activity.updated_by = user.get("user_id")
         for activity in restored_activities:
+            normalize_activity(activity)
+            _set_scalar_defaults(activity)
             _validate_activity(activity)
             _set_cached_cashflow(activity)
         db.session.flush()
