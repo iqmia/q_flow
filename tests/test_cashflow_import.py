@@ -71,15 +71,21 @@ def _payload():
     }
 
 
-def test_import_cashflow_creates_complete_scenario_atomically(app):
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
+def _permission():
+    return Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
+
+def _import(app, payload):
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        return app.test_client().post(
             "/project/unit-1/cashflows/import",
             headers=_auth(),
-            json=_payload(),
+            json=payload,
         )
+
+
+def test_import_cashflow_creates_complete_scenario_atomically(app):
+    result = _import(app, _payload())
 
     assert result.status_code == 201
     snapshot = result.get_json()["data"]
@@ -91,6 +97,8 @@ def test_import_cashflow_creates_complete_scenario_atomically(app):
     assert len(snapshot["activities"]) == 1
     assert snapshot["activities"][0]["name"] == "Concrete"
     assert snapshot["activities"][0]["cashflow_id"] == snapshot["id"]
+    assert snapshot["activities"][0]["activity_mode"] == "work"
+    assert snapshot["activities"][0]["distribution_type"] == "s_curve"
     assert snapshot["workflow"]
     assert snapshot["outflow"]
 
@@ -106,14 +114,8 @@ def test_import_cashflow_preserves_independent_inflow_settings(app):
         "inflow_curve_type": "linear",
         "inflow_curve_skew": 0.35,
     })
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
-            "/project/unit-1/cashflows/import",
-            headers=_auth(),
-            json=payload,
-        )
+    result = _import(app, payload)
 
     assert result.status_code == 201
     snapshot = result.get_json()["data"]
@@ -138,14 +140,8 @@ def test_import_cashflow_preserves_facility_terms_and_calculated_rows(app):
         "revolving": True,
         "sweep_priority": 0,
     }]
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
-            "/project/unit-1/cashflows/import",
-            headers=_auth(),
-            json=payload,
-        )
+    result = _import(app, payload)
 
     assert result.status_code == 201
     snapshot = result.get_json()["data"]
@@ -154,17 +150,108 @@ def test_import_cashflow_preserves_facility_terms_and_calculated_rows(app):
     assert snapshot["facility_fees"]
 
 
+def test_import_cashflow_accepts_manual_work_schedule_without_cost_or_duration(app):
+    payload = _payload()
+    payload["cashflow"]["activities"] = [{
+        "name": "Manual MEP work",
+        "activity_type": "mep",
+        "activity_mode": "work",
+        "distribution_type": "manual",
+        "cost_schedule_json": [200, 0, 500, 300],
+        "start": 1,
+        "advance": 0,
+        "retention": 0,
+        "release_retention_eop": 0,
+        "dlp": 0,
+        "duration_for_payment": 0,
+        "work_in_excess": 0,
+        "mobilization_period": 0,
+        "subcontracted": 0,
+        "skew": 0,
+        "no_billing_period": 0,
+    }]
+
+    result = _import(app, payload)
+
+    assert result.status_code == 201
+    activity = result.get_json()["data"]["activities"][0]
+    assert activity["activity_mode"] == "work"
+    assert activity["distribution_type"] == "manual"
+    assert activity["cost_schedule_json"] == [200.0, 0.0, 500.0, 300.0]
+    assert activity["cost"] == 1000.0
+    assert activity["duration"] == 4
+
+
+def test_import_cashflow_accepts_scheduled_cost_and_keeps_it_out_of_work(app):
+    payload = _payload()
+    payload["cashflow"]["use_independent_inflow_curve"] = False
+    payload["cashflow"]["activities"] = [
+        {
+            "name": "Work",
+            "activity_type": "General",
+            "activity_mode": "work",
+            "distribution_type": "linear",
+            "cost": 800,
+            "duration": 2,
+            "start": 0,
+            "advance": 0,
+            "retention": 0,
+            "release_retention_eop": 0,
+            "dlp": 0,
+            "duration_for_payment": 0,
+            "work_in_excess": 0,
+            "mobilization_period": 0,
+            "subcontracted": 0,
+            "skew": 0,
+            "no_billing_period": 0,
+        },
+        {
+            "name": "Purchase",
+            "activity_type": "mep",
+            "activity_mode": "scheduled_cost",
+            "distribution_type": "manual",
+            "cost_schedule_json": [0, 200],
+            "start": 0,
+        },
+    ]
+
+    result = _import(app, payload)
+
+    assert result.status_code == 201
+    snapshot = result.get_json()["data"]
+    purchase = snapshot["activities"][1]
+    assert purchase["cost"] == 200.0
+    assert purchase["duration"] == 2
+    assert purchase["cash_flow_json"]["marginal_work"] == [0.0, 0.0]
+    assert purchase["cash_flow_json"]["marginal_out_flow"] == [0.0, 200.0]
+    assert snapshot["summary"]["direct_cost"] == 1000.0
+    assert snapshot["duration"] == 2
+
+
+def test_import_old_version_one_linear_activity_keeps_legacy_linear_distribution(app):
+    payload = _payload()
+    activity = payload["cashflow"]["activities"][0]
+    activity["activity_type"] = "linear"
+    activity["cost"] = 100
+    activity["duration"] = 2
+    activity["subcontracted"] = 0
+    payload["cashflow"]["contract_value"] = 100
+    payload["cashflow"]["use_independent_inflow_curve"] = False
+
+    result = _import(app, payload)
+
+    assert result.status_code == 201
+    imported = result.get_json()["data"]["activities"][0]
+    assert imported["activity_mode"] == "work"
+    assert imported["distribution_type"] == "linear"
+    assert imported["cash_flow_json"]["marginal_work"] == [50.0, 50.0]
+
+
 def test_import_cashflow_rejects_invalid_activity_without_partial_rows(app):
     payload = _payload()
     payload["cashflow"]["activities"][0]["cost"] = 0
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
-            "/project/unit-1/cashflows/import",
-            headers=_auth(),
-            json=payload,
-        )
+    result = _import(app, payload)
 
     assert result.status_code == 400
     with app.app_context():
@@ -175,14 +262,8 @@ def test_import_cashflow_rejects_invalid_activity_without_partial_rows(app):
 def test_import_cashflow_rejects_unknown_format_version(app):
     payload = _payload()
     payload["version"] = 2
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
-            "/project/unit-1/cashflows/import",
-            headers=_auth(),
-            json=payload,
-        )
+    result = _import(app, payload)
 
     assert result.status_code == 400
     with app.app_context():
@@ -193,14 +274,8 @@ def test_import_cashflow_rejects_unknown_format_version(app):
 def test_import_cashflow_rejects_non_text_name_without_partial_rows(app):
     payload = _payload()
     payload["cashflow"]["name"] = 123
-    permission = Mock(return_value={"user_id": "owner-1", "unit_id": "unit-1"})
 
-    with patch("q_flow.routes.cashflows.ensure_unit_permission", permission):
-        result = app.test_client().post(
-            "/project/unit-1/cashflows/import",
-            headers=_auth(),
-            json=payload,
-        )
+    result = _import(app, payload)
 
     assert result.status_code == 400
     with app.app_context():
