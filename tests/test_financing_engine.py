@@ -261,7 +261,7 @@ class FinancingEngineTests(unittest.TestCase):
     def test_revolving_scheduled_draw_capacity_is_restored_by_repayment(self):
         result = calculate_financing(
             inflows=[0, 500, 0],
-            outflows=[0, 0, 0],
+            outflows=[800, 0, 700],
             ppc_base=[0, 0, 0],
             ppc_issued=[0, 0, 0],
             facilities=[{
@@ -285,7 +285,7 @@ class FinancingEngineTests(unittest.TestCase):
     def test_non_revolving_repayment_does_not_restore_draw_capacity(self):
         result = calculate_financing(
             inflows=[0, 500, 0],
-            outflows=[0, 0, 0],
+            outflows=[800, 0, 200],
             ppc_base=[0, 0, 0],
             ppc_issued=[0, 0, 0],
             facilities=[{
