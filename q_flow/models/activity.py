@@ -44,6 +44,14 @@ class ActivityType(Enum):
         return 0
 
 
+def _distribution_default(context):
+    """Preserve legacy direct ORM construction while defaulting new work to S-curve."""
+    params = context.get_current_parameters()
+    if str(params.get("activity_type") or "").casefold() == "linear":
+        return "linear"
+    return "s_curve"
+
+
 def effective_activity_mode(activity) -> str:
     """Return the calculation mode while preserving legacy nullable rows."""
     return activity.activity_mode or "work"
@@ -141,7 +149,9 @@ class Activity(db.Model, BaseMixin):
     # Calculation semantics. Columns remain nullable for legacy rows created
     # before this schema existed; helpers above provide runtime compatibility.
     activity_mode = db.Column(db.String(32), nullable=True, default="work")
-    distribution_type = db.Column(db.String(32), nullable=True, default="s_curve")
+    distribution_type = db.Column(
+        db.String(32), nullable=True, default=_distribution_default
+    )
     cost_schedule_json = db.Column(db.JSON, nullable=True)
 
     # Contractor's estimated cost of the activity. For manual work and
