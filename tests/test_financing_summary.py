@@ -36,6 +36,7 @@ def test_summary_exposes_financing_decision_metrics(app):
                 "repayment_method": "scheduled",
                 "repayment_schedule": {1: 20},
                 "limit": 100,
+                "end": 2,
                 "interest_rate": 0.1,
                 "fees": 5,
                 "revolving": True,
