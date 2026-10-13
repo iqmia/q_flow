@@ -18,6 +18,7 @@ from q_flow.models.activity import (
     DISTRIBUTION_TYPES,
     Activity,
     ActivityType,
+    effective_activity_mode,
     effective_distribution_type,
     normalize_activity,
 )
@@ -60,11 +61,11 @@ def _is_finite_number(value):
 
 def _validate_activity(activity):
     InvalidData.require_condition(
-        activity.activity_mode in ACTIVITY_MODES,
+        effective_activity_mode(activity) in ACTIVITY_MODES,
         "Activity mode must be work or scheduled_cost",
     )
     InvalidData.require_condition(
-        activity.distribution_type in DISTRIBUTION_TYPES,
+        effective_distribution_type(activity) in DISTRIBUTION_TYPES,
         "Activity distribution_type must be s_curve, linear, or manual",
     )
     InvalidData.require_condition(
