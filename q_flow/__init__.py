@@ -11,6 +11,7 @@ from os import path
 from json import dumps
 from flask import Config, Flask, jsonify, g
 from q_flow.command import create_cf
+from q_flow.commands.add_activity_mode_columns import add_activity_mode_columns
 from q_flow.commands.add_independent_inflow_columns import add_independent_inflow_columns
 from q_flow.commands.add_financing_facilities_column import add_financing_facilities_column
 from q_flow.commands.migrate_project_cashflows import migrate_projects_to_cashflows
@@ -37,6 +38,7 @@ def create_app(config_class=Config):
     er.init_app(app)
     cors.init_app(app)
     app.cli.add_command(create_cf)
+    app.cli.add_command(add_activity_mode_columns)
     app.cli.add_command(add_independent_inflow_columns)
     app.cli.add_command(add_financing_facilities_column)
     app.cli.add_command(migrate_projects_to_cashflows)
