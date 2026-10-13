@@ -115,6 +115,31 @@ def _validate_activity(activity):
     )
 
 
+def _uses_schedule_source(data, activity=None):
+    mode = data.get("activity_mode")
+    if mode is None:
+        mode = effective_activity_mode(activity) if activity is not None else "work"
+    if mode == "scheduled_cost":
+        return True
+
+    distribution = data.get("distribution_type")
+    if distribution is None:
+        if activity is not None:
+            distribution = effective_distribution_type(activity)
+        elif str(data.get("activity_type") or "").casefold() == "linear":
+            distribution = "linear"
+        else:
+            distribution = "s_curve"
+    return distribution == "manual"
+
+
+def _require_activity_source_fields(data, activity=None):
+    check_required(data, ["name"])
+    MissingData.require_condition(data.get("name"), "Missing activity name")
+    if not _uses_schedule_source(data, activity):
+        check_required(data, ["cost", "duration"])
+
+
 def _apply_activity_updates(activity, data, user_id):
     protected = {
         "id",
@@ -199,8 +224,7 @@ def new_activity(user, cashflow_id):
     if error:
         return error
 
-    check_required(data, ["name"])
-    MissingData.require_condition(data.get("name"), "Missing activity name")
+    _require_activity_source_fields(data)
 
     activity = Activity()
     activity.cashflow_id = cashflow_id
@@ -247,7 +271,7 @@ def update_activity(user, activity_id):
     if error:
         return error
 
-    check_required(data, ["name"])
+    _require_activity_source_fields(data, activity)
     _apply_activity_updates(activity, data, user.get("user_id"))
     snapshot = _finalize_mutation(
         activity.cashflow, activity=activity, use_type_skew=True
