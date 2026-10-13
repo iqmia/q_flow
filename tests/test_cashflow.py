@@ -38,7 +38,6 @@ class Test_cashflow(Base, TestCase):
                 release_retention_eop=0.5,
                 dlp=12,
                 duration_for_payment=3,
-                interest_rate=0.005,
                 subcontracted=0.7
             ).commit()
 
