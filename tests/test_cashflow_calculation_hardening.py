@@ -251,6 +251,8 @@ def test_serialized_cashflow_exposes_canonical_scenario_summary(app):
 
         assert summary == {
             "total_inflow": 50.0,
+            "work_cost": 100.0,
+            "scheduled_cost": 0.0,
             "subcontracted_cost": 50.0,
             "self_performed_cost": 50.0,
             "direct_cost": 100.0,
