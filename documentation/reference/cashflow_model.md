@@ -2,17 +2,17 @@
 
 This document is the canonical technical reference for the current CashflowPot financial model implemented in `q_flow`.
 
-It defines model direction, formulas, timing conventions, defaults, validation rules, compatibility behavior, and invariants that should remain consistent across the backend, Flutter client, exports, tests, public explanations, and future AI-assisted setup.
+It defines model direction, formulas, timing conventions, defaults, validation rules, compatibility behavior, financing semantics, summary metrics, and invariants that should remain consistent across the backend, Flutter client, exports, tests, public explanations, and future AI-assisted setup.
 
 For the shorter product explanation, see [`../product.md`](../product.md).
 
 ## 1. Purpose
 
-CashflowPot turns project execution, contract terms, and forecasting assumptions into a time-phased construction cash-flow forecast.
+CashflowPot turns project execution, project costs, contract/commercial terms, financing facilities, and forecasting assumptions into a time-phased construction cash-flow forecast.
 
 The model answers:
 
-> Given the execution we currently expect, the contract/commercial terms we know, and the assumptions we are using, how much cash is expected to go out, how much is expected to come in, when, and what funding gap could result?
+> Given the execution and project costs we currently expect, the contract/commercial terms we know, and the financing/forecast assumptions we are using, how much cash is expected to go out, how much is expected to come in, when, and what funding gap could result?
 
 The result is a **forecast, not a guarantee**.
 
@@ -24,9 +24,11 @@ A QAuth Unit represents one CashflowPot Project. A Project can contain multiple 
 QAuth Unit / Project
   └── Cashflow scenario
         └── Activities
+              ├── Work
+              └── Scheduled Cost
 ```
 
-A scenario owns its contract value, client terms, financing assumptions/facilities, inflow method, and activities.
+A scenario owns its contract value, client terms, financing assumptions/facilities, inflow method, and Activities.
 
 Activities own execution/project-cost timing. Work Activities can also own subcontract-side assumptions.
 
@@ -34,9 +36,9 @@ Activities own execution/project-cost timing. Work Activities can also own subco
 
 The engine works in integer **model periods**.
 
-The app is normally used monthly and `Activity.duration_units` defaults to `Months`, but the calculation engine itself works on periods rather than calendar dates. Within one scenario, timing inputs must use a consistent period convention.
+The app is normally used monthly and `Activity.duration_units` defaults to `Months`, but the calculation engine itself works on periods rather than calendar dates. Within one scenario, timing inputs must use one consistent period convention.
 
-Examples:
+Backend timing/index examples:
 
 ```text
 duration = 6               six local Activity periods
@@ -45,20 +47,25 @@ dlp = 12                   second retention release is twelve periods after firs
 start = 3                   Activity local period 1 begins after three project periods
 ```
 
+Backend offsets/indexes are zero-based where required by the data model. **User-facing periods are 1-based** (`P1`, `P2`, ...).
+
 The scenario **work duration** is derived only from Work Activity work series. The financial horizon can extend beyond work duration because Scheduled Cost, WIEB carry, payment delay, retention releases, subcontract payment timing, DLP, and financing facilities may occur later.
 
 ## 4. Direction of the model
 
 CashflowPot separates:
 
-1. **project execution / project cost / outflow**; and
-2. **main-contract value / inflow**.
+1. **project execution / project cost / outflow**;
+2. **main-contract value / client inflow**; and
+3. **financing facilities / funded cash position**.
 
 Work Activities create physical/cost-loaded work and project outflow. Scheduled Cost Activities create project cost/outflow but no physical or billable work.
 
 The main-contract value profile can be generated independently from Work Activity shape or linked to the combined Work Activity profile.
 
 Client-side contract terms are applied only after the contract-value work profile has been generated.
+
+Financing facilities are applied after project inflow/outflow is known; facility draws do not create project value or project cost.
 
 ## 5. Activity source model
 
@@ -120,6 +127,8 @@ duration = len(cost_schedule_json)
 
 Those two values are server-authoritative and are normalized from the schedule.
 
+The Flutter Scheduled Cost editor may accept **absolute project-period pairs** and convert them into the backend `start` offset plus dense local schedule. That UI representation does not change the backend source format.
+
 ## 6. Core commercial terminology
 
 ### Contract value
@@ -128,7 +137,7 @@ Those two values are server-authoritative and are normalized from the schedule.
 
 The total client contract value represented by the scenario.
 
-### Estimated activity cost
+### Estimated Activity cost
 
 `Activity.cost`
 
@@ -452,7 +461,7 @@ curve    = inflow_curve_type
 skew     = inflow_curve_skew, with NULL interpreted as 0.0
 ```
 
-For a Linear curve, contract value is distributed evenly over work duration. For an S-curve, the same `Work` mathematics and error correction are used so total contract-value work returns to contract value.
+For a Linear curve, contract value is distributed evenly over Work duration. For an S-curve, the same `Work` mathematics and error correction are used so total contract-value work returns to contract value.
 
 Scheduled Cost does not allocate main-contract value and does not extend this independent curve.
 
@@ -529,6 +538,24 @@ sum(project inflow) = contract value
 
 Client advance, retention, WIEB, payment period and DLP redistribute timing; they do not create or remove contract value.
 
+### PPC supporting series
+
+The financing engine also uses two derived client-progress series:
+
+```text
+ppc_issued
+```
+
+Net PPC certificate values in issue periods, before project payment delay.
+
+```text
+ppc_base
+```
+
+Client PPC cash receipts after payment timing, excluding client advance and retention releases.
+
+PPC Discount draw requests use `ppc_issued`; percent-of-PPC repayment uses `ppc_base`.
+
 ## 16. Project outflow
 
 Project outflow is the period-by-period sum of **all** current Activity outflows:
@@ -541,18 +568,18 @@ This includes Work Activity outflow and Scheduled Cost outflow. Deleted Activiti
 
 Changing Independent/Activity-linked inflow settings does not change Activity outflow.
 
-## 17. Net cash and financing
+## 17. Net cash before explicit facilities
 
 For each model period:
 
 ```text
-net_cash_flow_t = inflow_t - outflow_t
+project_net_cash_flow_t = inflow_t - outflow_t
 ```
 
 Without explicit financing facilities, the legacy scenario financing assumption applies financing cost only when cumulative cash is negative:
 
 ```text
-pre_finance_balance_t = balance_(t-1) + net_cash_flow_t
+pre_finance_balance_t = balance_(t-1) + project_net_cash_flow_t
 
 if pre_finance_balance_t < 0:
     balance_t = pre_finance_balance_t * (1 + interest_rate)
@@ -562,11 +589,117 @@ else:
 
 The API exposes this cumulative financed balance under the legacy key `outflow_with_interest`.
 
-When financing facilities are configured, facility draws, repayments, interest, fees, funded cash balance and unfunded shortfall are calculated by the financing engine. Activity mode does not change facility semantics; Scheduled Cost simply contributes to the project outflow the facilities may need to fund.
+When explicit facilities are configured, the facility engine becomes the financing layer instead.
 
-## 18. Current snapshot and summary
+## 18. Financing facilities
 
-Calculated snapshot keys include:
+Detailed rules are canonical in [`financing_facilities.md`](financing_facilities.md). The key calculation semantics are summarized here.
+
+### Draw methods
+
+```text
+automatic_shortfall
+scheduled
+ppc_base
+```
+
+### Repayment methods
+
+```text
+cashflow_sweep
+percent_of_ppc
+equal_installments
+scheduled
+```
+
+### Capacity
+
+For a finite limit `L`:
+
+```text
+revolving available capacity
+= L - current outstanding principal
+
+non-revolving available capacity
+= L - cumulative actual draws
+```
+
+Blank limit means unlimited.
+
+### Scheduled draw
+
+```text
+actual_draw_t = min(requested_draw_t, available_capacity_t)
+```
+
+Unavailable requested draw has no cashflow effect and is not carried forward.
+
+### Opening-principal interest
+
+```text
+interest_t = opening_outstanding_t * facility_interest_rate
+```
+
+A new draw begins accruing interest in the following period.
+
+### Scheduled-draw automatic repayment cap
+
+For a scheduled-draw facility using `% PPC` or cashflow sweep:
+
+```text
+automatic_repayment_t <= opening_outstanding_t
+```
+
+so same-period scheduled principal is not automatically repaid immediately.
+
+### Period order
+
+The engine applies, in order:
+
+1. project inflow/outflow;
+2. interest on opening principal and applicable fees;
+3. scheduled/PPC-linked draws;
+4. contractual repayments;
+5. cashflow sweeps;
+6. automatic-shortfall facilities;
+7. closing balances/capacity.
+
+Facility start/end constrain draw availability, not debt maturity.
+
+## 19. Funded cash position
+
+For facility-enabled scenarios:
+
+```text
+Total inflow_t
+= Project inflow_t + Facility draws_t
+
+Total outflow_t
+= Project outflow_t
+  + Principal repayments_t
+  + Facility interest_t
+  + Facility fees_t
+
+Funded net cash flow_t
+= Total inflow_t - Total outflow_t
+
+Closing cash balance_t
+= Closing cash balance_(t-1) + Funded net cash flow_t
+```
+
+Facility outstanding principal is a **balance**, not an inflow or outflow.
+
+The UI/export presentation groups these as:
+
+```text
+PROJECT CASHFLOW
+FACILITIES
+CASH POSITION
+```
+
+## 20. Current snapshot
+
+Core calculated snapshot keys include:
 
 ```text
 workflow
@@ -577,26 +710,116 @@ outflow_with_interest
 duration
 ```
 
-Facility-enabled snapshots add facility rows/draws/repayments/interest/fees and funded-balance data.
+Facility-enabled snapshots additionally include:
 
-Summary keys include:
+```text
+facility_rows
+facility_inflow
+facility_outflow
+facility_interest
+facility_fees
+funded_netflow
+pre_financing_balance
+unfunded_shortfall
+```
+
+Semantics:
+
+- `workflow` — Work Activity cost-loaded execution only;
+- `inflow` — client/project cash receipts;
+- `outflow` — all Activity project cost/payments;
+- `netflow` — pre-facility project net cash;
+- `facility_inflow` — actual facility draws;
+- `facility_outflow` — principal repayments;
+- `funded_netflow` — net cash including facility flows/cost;
+- `outflow_with_interest` — closing funded cash balance despite the legacy name;
+- `duration` — Work duration, not financial horizon.
+
+Each `facility_rows` item exposes:
+
+```text
+id
+name
+type
+draw_method
+repayment_method
+draw[]
+repayment[]
+interest[]
+fees[]
+outstanding[]
+available_limit[]
+```
+
+## 21. Canonical summary / KPIs
+
+The backend summary includes:
 
 ```text
 total_inflow
+work_cost
+scheduled_cost
 subcontracted_cost
 self_performed_cost
 direct_cost
 financing_cost
 total_cost
+total_facility_interest
+total_facility_fees
+minimum_pre_financing_balance
+minimum_pre_financing_period
+peak_pre_financing_need
+peak_pre_financing_period
+peak_facility_outstanding
+final_facility_outstanding
 final_cash_balance
+cash_after_debt_settlement
 work_duration
 dlp
 financial_horizon
 ```
 
-`direct_cost` includes all active Activities. `subcontracted_cost` is calculated from Work Activities only; Scheduled Cost remains project direct cost without being falsely classified as subcontracted work.
+When facilities are configured it can also include:
 
-## 19. Backend validation
+```text
+contractor_contribution
+peak_unfunded_shortfall
+```
+
+Definitions:
+
+```text
+Project cost = direct_cost = work_cost + scheduled_cost
+Financing cost = total_facility_interest + total_facility_fees
+Total cost = direct_cost + financing_cost
+Cash after debt settlement = final_cash_balance - final_facility_outstanding
+Peak funding requirement = max(0, -minimum_pre_financing_balance)
+```
+
+`cash_after_debt_settlement` is a principal-only settlement view. It does not invent future interest/maturity beyond the modeled horizon.
+
+Backend period indexes are zero-based. UI/export period labels for users are 1-based.
+
+## 22. Precision and authoritative totals
+
+`CashflowCalculator` rounds serialized period arrays for practical API/display compatibility.
+
+That rounding must not redefine source totals.
+
+Canonical totals should use authoritative source/summary values where available rather than summing visibly rounded period values.
+
+Examples:
+
+- Activity total = authoritative Activity `cost`;
+- Project cost = authoritative Work + Scheduled Cost totals;
+- Project inflow total = backend summary total;
+- facility totals = sums of the authoritative calculated facility series.
+
+This prevents drift such as twelve displayed `833.33` periods producing `9,999.96` for an Activity whose authoritative cost is `10,000.00`.
+
+Excel keeps financial cells numeric and uses number formats separately from underlying values.
+
+## 23. Backend validation
 
 Backend validation is authoritative.
 
@@ -610,6 +833,7 @@ Backend validation is authoritative.
 - `use_independent_inflow_curve`: boolean or null.
 - `inflow_curve_type`: `s_curve`, `linear`, or null.
 - non-null `inflow_curve_skew`: finite and strictly inside `(-1, 1)`.
+- financing facility payloads: validated for supported methods and method-specific values.
 
 ### Activity inputs
 
@@ -637,7 +861,7 @@ Manual Work and Scheduled Cost:
 
 Clients mirror useful validation for UX, but backend rules remain authoritative.
 
-## 20. Current backend defaults
+## 24. Current backend defaults
 
 ### Cashflow scenario defaults
 
@@ -648,12 +872,13 @@ Clients mirror useful validation for UX, but backend rules remain authoritative.
 | Retention released at first release | 50% |
 | DLP | 12 periods |
 | Client payment period | 1 period |
-| Financing rate | 0.5% per period |
+| Legacy financing rate | 0.5% per period |
 | Client WIEB assumption | 20% |
 | Contract value | 0 |
 | Use Independent inflow curve | `true` |
 | Inflow curve type | `s_curve` |
 | Inflow curve skew | `0.0` |
+| Financing facilities | empty list |
 
 ### Activity model defaults
 
@@ -678,9 +903,9 @@ Clients mirror useful validation for UX, but backend rules remain authoritative.
 | Skew | `0.0` |
 | No-billing period | 0 |
 
-Activity presets can provide different starting values and a distribution suggestion. Presets are input helpers, not calculation identity.
+Activity presets can provide different starting values and a distribution suggestion. Facility presets likewise provide editable starting values. Presets are input helpers, not immutable calculation identity.
 
-## 21. Removed legacy Activity inputs
+## 25. Removed legacy Activity inputs
 
 These fields are no longer part of the active Activity ORM/API/Flutter source model:
 
@@ -690,11 +915,11 @@ These fields are no longer part of the active Activity ORM/API/Flutter source mo
 - Activity-level `interest_rate`;
 - `compounding_period`.
 
-Existing upgraded database installations may physically retain old nullable columns because the activity-mode schema upgrade is intentionally non-destructive. The active ORM no longer maps or emits them.
+Existing upgraded database installations may physically retain old nullable columns because the Activity-mode schema upgrade is intentionally non-destructive. The active ORM no longer maps or emits them.
 
 `mobilization_period` remains active as the pre-work/no-work period.
 
-## 22. Semantic naming guidance
+## 26. Semantic naming guidance
 
 | Backend/API name | Preferred semantic meaning |
 | --- | --- |
@@ -708,7 +933,7 @@ Existing upgraded database installations may physically retain old nullable colu
 | `Activity.activity_type` | Activity template/category |
 | `Activity.activity_mode` | Work vs Scheduled Cost |
 | `Activity.distribution_type` | S-curve / Linear / Manual Work distribution |
-| `Activity.cost_schedule_json` | Dense Activity-local manual cost/work schedule |
+| `Activity.cost_schedule_json` | Dense Activity-local manual/scheduled source |
 | `Activity.cost` | Estimated Activity cost |
 | `Activity.subcontracted` | Subcontracted share of Work Activity |
 | `Activity.advance` | Subcontract advance |
@@ -717,12 +942,15 @@ Existing upgraded database installations may physically retain old nullable colu
 | `Activity.work_in_excess` | Subcontract WIEB assumption (%) |
 | `Activity.mobilization_period` | Pre-work period |
 | API `workflow` | Cost-loaded Work Activity execution profile |
-| API `netflow` | Net cash flow |
-| API `outflow_with_interest` | Cumulative cash balance after financing |
+| API `inflow` | Project inflow / Client PPC receipts |
+| API `outflow` | Project cost/payments |
+| API `netflow` | Project net cash before facilities |
+| API `funded_netflow` | Net cash including facilities |
+| API `outflow_with_interest` | Closing funded cash balance |
 
 User-facing text should expand WIEB and DLP at first use.
 
-## 23. Current calculation boundaries
+## 27. Current calculation boundaries
 
 The engine does not currently calculate:
 
@@ -732,19 +960,22 @@ The engine does not currently calculate:
 - detailed BOQ measurement or earned-value measurement;
 - tax, currency, escalation, bonds, and similar mechanisms unless represented indirectly in entered values/costs;
 - individual Activity selling values or Activity-specific markup;
-- detailed Schedule of Values; or
-- accounting statements.
+- detailed Schedule of Values;
+- accounting statements;
+- automatic linking of LC draws to Scheduled Cost purchases;
+- facility maturity beyond modeled inputs; or
+- future interest beyond the modeled horizon.
 
 Those may influence scenario inputs, but are outside the current calculation engine.
 
-## 24. Regression invariants
+## 28. Regression invariants
 
 Calculation changes should preserve or deliberately revise these invariants with tests and documentation together:
 
 1. Generated or Manual Work marginal Activity work sums to Work Activity estimated cost.
 2. Total Work Activity outflow sums to Work Activity estimated cost for valid inputs.
 3. Scheduled Cost outflow sums to its derived Activity cost and its project-work contribution is zero.
-4. Project `workflow` and work duration use Work Activities only.
+4. Project `workflow` and Work duration use Work Activities only.
 5. Project outflow includes both Work and Scheduled Cost Activities.
 6. Activity-linked contract value uses `contract_value / Work Activity cost`; Scheduled Cost does not create billed work.
 7. Independent contract work uses Work Activity-derived execution duration only.
@@ -758,10 +989,16 @@ Calculation changes should preserve or deliberately revise these invariants with
 15. Advance plus retention cannot exceed 100% at client or Work Activity subcontract level.
 16. Deleted Activities do not contribute to current project work/outflow.
 17. Positive current skew front-loads an S-curve relative to balanced; negative skew back-loads it.
-18. A scenario with Scheduled Cost but no Work may still return outflow/net cash with `workflow=[]` and work duration `0`.
+18. A scenario with Scheduled Cost but no Work may still return outflow/net cash with `workflow=[]` and Work duration `0`.
 19. Legacy rows/files without new Activity fields remain Work Activities; legacy `activity_type=linear` remains linear.
 20. `cash_flow_json` keeps the same `marginal_work` / `marginal_out_flow` shape for generated Work, Manual Work and Scheduled Cost.
+21. Scheduled facility draws are capped by capacity; unavailable requested draw has no cashflow effect and is not carried forward.
+22. Revolving repayment restores capacity; non-revolving repayment does not restore cumulative draw capacity.
+23. Scheduled same-period draw is not automatically repayable through `% PPC` or sweep beyond opening principal.
+24. Facility interest is charged on opening principal.
+25. Canonical Activity/project totals must not drift because displayed period values are rounded.
+26. User-facing period labels are 1-based while backend indexes/offsets remain compatible with the existing schema.
 
 If a future change intentionally revises one of these rules, update implementation, tests, this reference, and affected overview/UI documentation in the same change.
 
-Last reviewed against current `q_flow` implementation: 13 October 2026.
+Last reviewed against current `q_flow` implementation: 14 October 2026.
