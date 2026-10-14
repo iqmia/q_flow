@@ -4,7 +4,7 @@
 
 **Goal:** Reconcile all current CashflowPot application documentation with the implemented activity modes, Scheduled Cost, financing facilities, KPI/presentation model, and Excel export behavior.
 
-**Architecture:** Keep `q_flow/documentation/` as the current-product source of truth. Update overview documents first, then detailed references and roadmap boundaries, then repo READMEs/cross-links. Historical files under `docs/superpowers/specs/` and `docs/superpowers/plans/` remain historical and are not rewritten as current documentation.
+**Architecture:** Keep `q_flow/documentation/` as the current-product source of truth. Update overview documents first, then detailed references and roadmap boundaries, then repo READMEs/cross-links. Historical files under `docs/superpowers/specs/` and older `docs/superpowers/plans/` remain historical and are not rewritten as current documentation.
 
 **Tech Stack:** Markdown documentation, Flask/q_flow implementation references, Flutter CashflowPot implementation references.
 
@@ -36,10 +36,10 @@
 - Modify: `documentation/product.md`
 - Modify: `documentation/ui-ux.md`
 
-- [ ] Reframe Activities as Work or Scheduled Cost and document their different calculation effects.
-- [ ] Document financing facilities as current product behavior and define the Project Cashflow / Facilities / Cash Position presentation.
-- [ ] Document current KPIs, 1-based period display, authoritative totals, amount scaling, and read-only/calculated fields.
-- [ ] Update review dates.
+- [x] Reframe Activities as Work or Scheduled Cost and document their different calculation effects.
+- [x] Document financing facilities as current product behavior and define the Project Cashflow / Facilities / Cash Position presentation.
+- [x] Document current KPIs, 1-based period display, authoritative totals, amount scaling, and read-only/calculated fields.
+- [x] Update review dates.
 
 ### Task 2: Technical and calculation references
 
@@ -49,22 +49,22 @@
 - Modify: `documentation/reference/financing_facilities.md`
 - Modify: `documentation/reference/cashflow_json_format.md`
 
-- [ ] Reconcile Activity source fields, snapshot keys, summary/KPI fields, and duration semantics.
-- [ ] Reconcile financing draw/repayment/capacity sequencing and current cashflow presentation naming.
-- [ ] Document display-vs-calculation precision and canonical totals where relevant.
-- [ ] Confirm JSON v1 compatibility and Scheduled Cost/Manual Work schedule semantics.
+- [x] Reconcile Activity source fields, snapshot keys, summary/KPI fields, and duration semantics.
+- [x] Reconcile financing draw/repayment/capacity sequencing and current cashflow presentation naming.
+- [x] Document display-vs-calculation precision and canonical totals where relevant.
+- [x] Confirm JSON v1 compatibility and Scheduled Cost/Manual Work schedule semantics.
 
 ### Task 3: Current/future boundary and documentation index
 
 **Files:**
 - Modify: `documentation/future.md`
 - Modify: `documentation/README.md`
-- Review/update date only if still current: `documentation/deployment.md`
-- Review/update date only if still current: `documentation/reference/security.md`
+- Review/update: `documentation/deployment.md`
+- Review/update: `documentation/reference/security.md`
 
-- [ ] Remove implemented financing facilities from future-work framing; retain only genuinely future facility/report improvements.
-- [ ] Add financing-facilities reference to the documentation index.
-- [ ] Record that deployment/security were reviewed against this feature and are behaviorally unchanged.
+- [x] Remove implemented financing facilities from future-work framing; retain only genuinely future facility/report improvements.
+- [x] Add financing-facilities reference to the documentation index.
+- [x] Record that deployment/security were reviewed against this feature and are behaviorally unchanged.
 
 ### Task 4: Repository READMEs
 
@@ -72,12 +72,16 @@
 - Modify: `README.md` in `q_flow`
 - Modify: `README.md` in `iqmia/cashflowpot`
 
-- [ ] Update high-level product wording for Work/Scheduled Cost and financing facilities.
-- [ ] Correct canonical documentation links.
-- [ ] Keep q_flow as calculation/documentation authority and Flutter as presentation/input/export client.
+- [x] Update high-level product wording for Work/Scheduled Cost and financing facilities.
+- [x] Correct canonical documentation links.
+- [x] Keep q_flow as calculation/documentation authority and Flutter as presentation/input/export client.
 
 ### Task 5: Verification
 
-- [ ] Search current documentation for stale phrases such as `OVERALL CASH POSITION`, financing facilities described as future, and the obsolete Flutter `documentation/cashflow_model.md` link.
+- [x] Review current documentation for stale current/future terminology and update the documentation contract test, including `financing_facilities.md`.
 - [ ] Run backend documentation tests / full `pytest` locally.
-- [ ] Run Flutter tests locally because README/export/UI contract changes are documentation-only but share the active branch.
+- [ ] Run Flutter tests locally because the README-only client documentation change sits on the active feature branch with the existing UI/Excel changes.
+
+## Verification status
+
+No GitHub Actions run is associated with the latest documentation commit. Local backend/Flutter test execution is therefore still required before the feature branch is considered fully verified.
