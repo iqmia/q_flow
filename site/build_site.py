@@ -45,22 +45,22 @@ PAGES: tuple[PublicPage, ...] = (
     PublicPage(
         'index.html', 'index.html', '/',
         'Construction Cash-Flow Simulation & Forecasting | CashflowPot',
-        'Simulate construction project cash flow from execution timing, contract terms and forecasting assumptions for tendering, financing, lender review, budgeting and project reforecasting.',
+        'Simulate construction project cash flow from Work activities, Scheduled Cost, contract terms and financing facilities for tendering, lender review, funding and project reforecasting.',
     ),
     PublicPage(
         'how-it-works.html', 'how-it-works/index.html', '/how-it-works/',
         'How CashflowPot Works | Construction Cash-Flow Forecasting',
-        'See how CashflowPot combines execution timing, contract terms and assumptions to simulate construction project inflow, outflow, working capital and funding requirements.',
+        'See how CashflowPot combines Work activities, Scheduled Cost, client terms and financing facilities into Project Cashflow, Facilities and Cash Position.',
     ),
     PublicPage(
         'methodology.html', 'methodology/index.html', '/methodology/',
         'CashflowPot Methodology | Construction Cash-Flow Model',
-        'Understand how CashflowPot separates execution, contract terms and forecasting assumptions to calculate project inflow, outflow, net cash and funding requirements.',
+        'Understand Work versus Scheduled Cost, client PPC timing, facility capacity, funding requirement, cash position and debt-settlement metrics in CashflowPot.',
     ),
     PublicPage(
         'about.html', 'about/index.html', '/about/',
         'About CashflowPot | Construction Cash-Flow Simulation',
-        'CashflowPot is a focused construction cash-flow simulation and forecasting product for tendering, financing, lender review, portfolio capacity and project reforecasting.',
+        'CashflowPot is a construction cash-flow simulation and financing decision product for tendering, contractor funding, lender review and project reforecasting.',
         schema_type='AboutPage',
     ),
     PublicPage(
@@ -119,15 +119,19 @@ def _structured_data_for(page: PublicPage) -> Optional[Dict[str, Any]]:
                     'applicationCategory': 'BusinessApplication',
                     'operatingSystem': 'Web',
                     'description': (
-                        'Construction cash-flow simulation and forecasting for '
+                        'Construction cash-flow simulation and financing analysis for '
                         'project, commercial and finance decisions.'
                     ),
                     'featureList': [
                         'Scenario forecasting',
-                        'Activity-based outflow forecasting',
+                        'Work activity forecasting',
+                        'Scheduled Cost forecasting',
                         'Independent contract curve inflow',
                         'Activity-linked inflow',
+                        'Financing facilities with draws and repayments',
                         'Cash position and working capital analysis',
+                        'Peak funding requirement and facility usage',
+                        'Cash after debt settlement',
                         'Excel export',
                     ],
                     'publisher': {'@id': ORGANIZATION_ID},
@@ -202,14 +206,20 @@ def _render_sitemap_xml() -> str:
 def _render_llms_txt() -> str:
     return (
         '# CashflowPot\n\n'
-        '> CashflowPot is a construction cash-flow simulation and forecasting product for '
-        'project, commercial and finance decisions. It turns execution timing, contract '
-        'terms and forecasting assumptions into expected inflow, outflow, cash position '
-        'and working-capital/funding exposure.\n\n'
+        '> CashflowPot is a construction cash-flow simulation and financing product for '
+        'project, commercial and finance decisions. It models Work activities, Scheduled '
+        'Cost, contract terms and financing facilities to calculate Project Cashflow, '
+        'Facilities, Cash Position, funding requirement and debt exposure.\n\n'
+        '## Current model\n'
+        '- Work activities can use S-curve, Linear or Manual Work distributions.\n'
+        '- Scheduled Cost creates project outflow without physical Work, client PPC or extra Work duration.\n'
+        '- Client inflow can use an Independent contract curve or Activity-linked inflow.\n'
+        '- Financing facilities can model scheduled, PPC-linked or automatic-shortfall draws, repayments, interest, fees and outstanding principal.\n'
+        '- Key outputs include Peak Funding Requirement, Peak Facility Usage, Outstanding Facilities, Closing Cash and Cash after Debt Settlement.\n\n'
         '## Canonical public pages\n'
         f'- [Home]({SITE_ORIGIN}/): Product overview and use cases.\n'
-        f'- [How it works]({SITE_ORIGIN}/how-it-works/): How scenarios are built and revised.\n'
-        f'- [Methodology]({SITE_ORIGIN}/methodology/): Cash-flow model concepts, commercial terms and forecasting assumptions.\n'
+        f'- [How it works]({SITE_ORIGIN}/how-it-works/): How scenarios are built, financed and revised.\n'
+        f'- [Methodology]({SITE_ORIGIN}/methodology/): Activity, contract, financing and cash-position methodology.\n'
         f'- [About]({SITE_ORIGIN}/about/): Product and operator information.\n'
         f'- [Contact]({SITE_ORIGIN}/contact/): Official Quollnet contact channels.\n'
         f'- [Privacy]({SITE_ORIGIN}/privacy/): CashflowPot privacy information.\n'
