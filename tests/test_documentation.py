@@ -16,6 +16,7 @@ class DocumentationTest(TestCase):
             "deployment.md",
             "future.md",
             "reference/cashflow_model.md",
+            "reference/financing_facilities.md",
             "reference/cashflow_json_format.md",
             "reference/security.md",
         ):
@@ -41,6 +42,7 @@ class DocumentationTest(TestCase):
             "deployment.md",
             "future.md",
             "reference/cashflow_model.md",
+            "reference/financing_facilities.md",
             "reference/cashflow_json_format.md",
             "reference/security.md",
         ):
@@ -56,20 +58,25 @@ class DocumentationTest(TestCase):
             "contract terms",
             "forecasting assumptions",
             "work in excess of billings (wieb)",
-            "outflow remains activity-based",
+            "scheduled cost",
+            "financing facilities",
+            "project outflow is the sum",
+            "cash position",
+            "cash after debt settlement",
             "forecast, not a guarantee",
             "do not use `billing deferral`",
         ):
             self.assertIn(required, folded)
         for forbidden in (
             "lightweight by design",
-            "does not replace primavera p6",
             "activity-specific selling value and markup allocation",
+            "overall cash position",
         ):
             self.assertNotIn(forbidden, folded)
 
-    def test_reference_documents_match_current_model_and_auth_language(self):
+    def test_reference_documents_match_current_model_financing_and_auth_language(self):
         model = (DOCS / "reference" / "cashflow_model.md").read_text(encoding="utf-8")
+        facilities = (DOCS / "reference" / "financing_facilities.md").read_text(encoding="utf-8")
         portable = (DOCS / "reference" / "cashflow_json_format.md").read_text(encoding="utf-8")
         security = (DOCS / "reference" / "security.md").read_text(encoding="utf-8")
 
@@ -79,8 +86,25 @@ class DocumentationTest(TestCase):
 
         self.assertIn("use_independent_inflow_curve is True", model)
         self.assertIn("inflow_curve_type is not NULL", model)
+        self.assertIn("scheduled_cost", model)
+        self.assertIn("funded_netflow", model)
+        self.assertIn("cash_after_debt_settlement", model)
+
+        for required in (
+            "PPC issued",
+            "PPC receipts",
+            "Revolving",
+            "Non-revolving",
+            "CASH POSITION",
+            "Cash after debt settlement",
+        ):
+            self.assertIn(required, facilities)
+        self.assertNotIn("OVERALL CASH POSITION", facilities)
+
         self.assertIn("cashflowpot.cashflow", portable)
         self.assertIn("version", portable)
+        self.assertIn("financing_facilities", portable)
+        self.assertIn("scheduled_cost", portable)
 
         for required in (
             "Authorization: Bearer",
@@ -94,6 +118,31 @@ class DocumentationTest(TestCase):
             "edit:cashflow",
         ):
             self.assertIn(required, security)
+
+    def test_ui_ux_documents_current_result_and_excel_contract(self):
+        text = (DOCS / "ui-ux.md").read_text(encoding="utf-8")
+        for required in (
+            "Scheduled Cost",
+            "user-facing periods are **1-based**",
+            "PROJECT CASHFLOW",
+            "FACILITIES",
+            "CASH POSITION",
+            "Cash after debt settlement",
+            "one decimal place",
+            "authoritative",
+            "pastel",
+        ):
+            self.assertIn(required, text)
+        self.assertNotIn("OVERALL CASH POSITION", text)
+
+    def test_future_document_does_not_describe_current_financing_as_future(self):
+        text = (DOCS / "future.md").read_text(encoding="utf-8")
+        folded = text.casefold()
+        self.assertIn("financing facilities are **current product behavior**", folded)
+        self.assertIn("full scenario report", folded)
+        self.assertIn("ai-assisted project and scenario setup", folded)
+        self.assertNotIn("## 5. project financing facilities", folded)
+        self.assertNotIn("add a financing layer", folded)
 
     def test_deployment_document_matches_current_vps_contract(self):
         text = (DOCS / "deployment.md").read_text(encoding="utf-8")
