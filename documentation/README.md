@@ -4,21 +4,38 @@ This folder is the source of truth for the **current product**. Start here when 
 
 ## Read order
 
-1. [`product.md`](product.md) — what CashflowPot is, who it is for, the model boundaries, terminology, and product/business rules.
-2. [`technical.md`](technical.md) — how the repositories, backend, QAuth, data model, calculation engine, import/export, and public site fit together.
-3. [`ui-ux.md`](ui-ux.md) — user-facing terminology and interface rules that should stay consistent across the Flutter app, public site, exports, and future AI setup.
+1. [`product.md`](product.md) — what CashflowPot is, who it is for, the Work/Scheduled Cost model, inflow methods, financing facilities, KPIs, and stable product/business rules.
+2. [`technical.md`](technical.md) — how the repositories, backend, QAuth, data model, calculation engine, facilities, import/export, Excel reporting, and public site fit together.
+3. [`ui-ux.md`](ui-ux.md) — user-facing terminology and interface rules that should stay consistent across the Flutter app, public site, tables, charts, KPIs, exports, and future AI setup.
 4. [`deployment.md`](deployment.md) — production topology and the exact build/deploy workflow for the public site, Flutter app, and Apache/Gunicorn API.
 5. [`future.md`](future.md) — approved directions that are **not current product behavior yet**.
 
 ## Detailed references
 
-The overview documents above should stay readable. Exact formulas, file formats, and security mechanics live in `reference/`:
+The overview documents above should stay readable. Exact formulas, file formats, financing rules, and security mechanics live in `reference/`:
 
-- [`reference/cashflow_model.md`](reference/cashflow_model.md) — canonical calculation rules, formulas, defaults, validation, and invariants.
-- [`reference/cashflow_json_format.md`](reference/cashflow_json_format.md) — portable `.cashflowpot.json` import/export format.
+- [`reference/cashflow_model.md`](reference/cashflow_model.md) — canonical calculation rules, formulas, Activity modes, inflow/outflow, summary metrics, defaults, validation, and invariants.
+- [`reference/financing_facilities.md`](reference/financing_facilities.md) — facility draw/repayment/capacity/interest sequencing, PPC semantics, facility output rows, KPIs, and cashflow presentation.
+- [`reference/cashflow_json_format.md`](reference/cashflow_json_format.md) — portable `.cashflowpot.json` input/export format, Version-1 compatibility, Activity schedules, and facility definitions.
 - [`reference/security.md`](reference/security.md) — current QAuth/JWT authentication, app identity, project-unit authorization, and token refresh behavior.
 
 When a detailed reference and an overview conflict, verify the implementation and fix both documents. Do not preserve a contradiction merely because one document is older.
+
+## Current calculation/presentation model at a glance
+
+Current product behavior includes:
+
+- Work and Scheduled Cost Activity modes;
+- S-curve, Linear, and Manual Work distributions;
+- Independent and Activity-linked client inflow methods;
+- Work-only execution duration with a potentially longer financial horizon;
+- financing facilities with scheduled, PPC-linked, and automatic-shortfall draws;
+- multiple facility repayment methods;
+- Project Cashflow → Facilities → Cash Position result presentation;
+- canonical backend summary/KPI values; and
+- full Excel cashflow/report output driven by the calculated scenario.
+
+These are **current product rules**, not roadmap items.
 
 ## Current product vs development history
 
@@ -33,6 +50,8 @@ Those files are useful history, but they are not the current product definition.
 
 ## Documentation rule
 
-When a change affects product meaning, calculations, user-facing terminology, architecture, deployment, security, or an approved future direction, update the relevant file here in the same change. Avoid scattering current rules through temporary plans, chat notes, or code comments only.
+When a change affects product meaning, calculations, user-facing terminology, architecture, deployment, security, import/export, Excel/reporting, or an approved future direction, update the relevant file here in the same change. Avoid scattering current rules through temporary plans, chat notes, or code comments only.
 
-Last reviewed: 11 October 2026.
+For cross-repository client work, the Flutter repository README should point back here rather than maintaining a competing copy of the calculation rules.
+
+Last reviewed: 14 October 2026.
