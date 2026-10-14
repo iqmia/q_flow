@@ -35,6 +35,8 @@ Percentage-like values are stored as API fractions:
 
 Timing values are integer model **periods**. The portable format does not assume that a period must be a calendar month.
 
+Backend period indexes/start offsets use the model's existing zero-based convention. User-facing Flutter period labels are 1-based, so the client converts between UI representation and portable/backend values where required.
+
 Important validation rules include:
 
 - project/client `advance + retention <= 1.0`;
@@ -43,7 +45,8 @@ Important validation rules include:
 - non-null `inflow_curve_skew` strictly inside `(-1, 1)`;
 - generated Work Activity cost > 0 and duration > 0;
 - Manual Work and Scheduled Cost require a non-empty `cost_schedule_json` with finite non-negative values and a total > 0;
-- payment period, DLP, start, pre-work, and no-billing period are non-negative integers.
+- payment period, DLP, start, pre-work, and no-billing period are non-negative integers;
+- financing facilities must use supported draw/repayment methods and valid method-specific values.
 
 ## 3. Cash-flow object
 
@@ -89,9 +92,9 @@ financing_facilities
 activities
 ```
 
-`financing_facilities` is optional for older version-1 files. Scheduled facility draws and repayments continue to use the facility period-to-amount map representation. Activity schedules use the separate dense-list representation documented below.
-
 `name` must be non-empty text. `description`, when present, must be text.
+
+`interest_rate` is the legacy scenario financing rate used when explicit facilities are not configured. Explicit facility definitions carry their own financing terms.
 
 ## 4. Inflow forecast settings
 
@@ -124,11 +127,65 @@ Activity `work_in_excess` is the equivalent subcontract-side timing assumption f
 
 WIEB changes timing, not lifetime value.
 
-## 6. Activity object
+## 6. Financing facilities
 
-Activities separate **category/template**, **calculation mode**, and **work distribution**.
+`financing_facilities` is an optional Version-1 field. Older files without it remain valid.
 
-### 6.1 Generated Work Activity
+Each facility is a source/input definition. Calculated facility arrays such as Draw, Repayment, Interest, Fees, Outstanding, Available Limit, funded cash balance, and shortfall are **not** portable source data.
+
+Current facility concepts include:
+
+```text
+name
+type
+start
+end
+limit
+fees
+interest_rate
+revolving
+draw_method
+repayment_method
+sweep_priority
+advance_portion
+repayment_percent
+draw_schedule
+repayment_schedule
+installment_start
+installment_interval
+installment_count
+```
+
+Method-specific fields are used only when relevant to the selected draw/repayment method.
+
+Supported draw methods:
+
+```text
+automatic_shortfall
+scheduled
+ppc_base
+```
+
+Supported repayment methods:
+
+```text
+cashflow_sweep
+percent_of_ppc
+equal_installments
+scheduled
+```
+
+Scheduled draw/repayment schedules use period-to-amount maps. They are financing schedules, not Activity project-cost schedules.
+
+A blank/null facility limit means unlimited. For finite limits, revolving capacity is based on current outstanding principal while non-revolving capacity is based on cumulative actual draws.
+
+The exact calculation semantics are defined in [`financing_facilities.md`](financing_facilities.md).
+
+## 7. Activity object
+
+Activities separate **category/template**, **calculation mode**, and **Work distribution**.
+
+### 7.1 Generated Work Activity
 
 ```json
 {
@@ -173,7 +230,7 @@ manual
 
 Generated `s_curve` and `linear` Work Activities use `cost` and `duration` and do not require a schedule.
 
-### 6.2 Manual Work Activity
+### 7.2 Manual Work Activity
 
 ```json
 {
@@ -196,7 +253,7 @@ Generated `s_curve` and `linear` Work Activities use `cost` and `duration` and d
 }
 ```
 
-`cost_schedule_json` is a **dense activity-local marginal list**. The example above means four local periods with values 200, 0, 500 and 300. `start` shifts the resulting series into project time.
+`cost_schedule_json` is a **dense Activity-local marginal list**. The example above means four local periods with values 200, 0, 500 and 300. `start` shifts the resulting series into project time.
 
 For Manual Work:
 
@@ -205,9 +262,9 @@ cost     = sum(cost_schedule_json)
 duration = len(cost_schedule_json)
 ```
 
-The backend derives those values from the schedule. The manual schedule replaces only the generated base work curve; the existing pre-work, subcontract share, no-billing, WIEB, advance, retention, payment-period and DLP logic then operates unchanged.
+The backend derives those values from the schedule. The manual schedule replaces only the generated base Work curve; the existing pre-work, subcontract share, no-billing, WIEB, advance, retention, payment-period and DLP logic then operates unchanged.
 
-### 6.3 Scheduled Cost Activity
+### 7.3 Scheduled Cost Activity
 
 ```json
 {
@@ -229,9 +286,19 @@ marginal_work     = zero series
 marginal_out_flow = cost_schedule_json
 ```
 
-Scheduled Cost affects project direct cost, outflow, net cash and financing need. It does **not** create physical work, client billed work/PPC, or project work duration. Subcontract terms are not applied to the schedule.
+Scheduled Cost affects project direct cost, outflow, net cash and financing need. It does **not** create physical Work, client billed work/PPC, or project Work duration. Subcontract terms are not applied to the schedule.
 
-### 6.4 Current accepted Activity source fields
+The backend still stores the schedule as a dense **Activity-local** list plus `start`.
+
+The Flutter Scheduled Cost editor may let the user enter absolute project-period pairs such as:
+
+```text
+4:25000, 7:75000
+```
+
+The client converts that to `start = firstPeriod - 1` plus a dense local schedule before sending/exporting the portable model. The portable JSON itself does not store the human-entered pair string.
+
+### 7.4 Current accepted Activity source fields
 
 ```text
 name
@@ -259,7 +326,7 @@ no_billing_period
 
 `mobilization_period` is the legacy backend field currently used as the Activity **pre-work / no-work period** and remains active for Work Activities.
 
-## 7. Version-1 compatibility
+## 8. Version-1 compatibility
 
 The new Activity fields are optional for older Version 1 files.
 
@@ -278,9 +345,11 @@ otherwise                  -> s_curve
 
 This preserves old files that used `activity_type = "linear"` as the calculation switch while allowing new files to keep type/category and distribution independent.
 
+Older Version-1 files without `financing_facilities` also remain valid.
+
 Do not silently change the meaning of an existing Version 1 field. If a future change cannot be made compatibly, introduce and document a new format version.
 
-## 8. Deliberately excluded data
+## 9. Deliberately excluded data
 
 Portable files do not contain or trust server-owned identity or calculated output such as:
 
@@ -288,7 +357,9 @@ Portable files do not contain or trust server-owned identity or calculated outpu
 - QAuth Unit/project ownership;
 - creator/updater IDs or timestamps;
 - deleted-state flags;
-- calculated `workflow`, `inflow`, `outflow`, `netflow`, or cumulative financed-balance arrays;
+- calculated `workflow`, `inflow`, `outflow`, `netflow`, funded-net, or cumulative balance arrays;
+- calculated facility rows/series;
+- backend summary/KPI values;
 - cached Activity `cash_flow_json`.
 
 The following removed legacy Activity inputs are also not portable source fields:
@@ -301,12 +372,14 @@ The following removed legacy Activity inputs are also not portable source fields
 
 Existing upgraded database tables may physically retain old nullable columns, but the active ORM/API/client model does not use them.
 
-## 9. Flutter export/import behavior
+## 10. Flutter export/import behavior
 
-The Flutter client uses the same Version 1 marker. On export it writes current scenario and Activity source inputs. A simple Activity schedule editor may display a dense schedule as user-facing pairs such as:
+The Flutter client uses the same Version 1 marker. On export it writes current scenario, facility, and Activity source inputs.
+
+A Manual Work schedule editor may display a dense schedule as user-facing local pairs such as:
 
 ```text
-1: 500, 4: 900
+1:500, 4:900
 ```
 
 but the stored/exported value remains:
@@ -315,29 +388,40 @@ but the stored/exported value remains:
 [500, 0, 0, 900]
 ```
 
+A Scheduled Cost editor uses absolute project-period pairs for the user but exports the converted `start` + dense local schedule.
+
 This keeps UI representation independent from the backend schema.
 
 On import, Flutter parses and validates the scenario and every Activity before submitting the payload. Backend validation remains authoritative.
 
-## 10. Backend import behavior
+## 11. Backend import behavior
 
 The backend import endpoint:
 
 1. requires the Version 1 format marker;
 2. requires a cash-flow object and Activity list;
 3. filters scenario and Activity data to supported fields;
-4. normalizes legacy/new Activity mode and distribution semantics;
-5. derives `cost` and `duration` from manual/scheduled schedules;
-6. validates the scenario and every Activity;
-7. calculates the imported scenario snapshot; and
-8. commits the scenario and all Activities together only after the complete import is valid.
+4. validates/normalizes financing facility definitions;
+5. normalizes legacy/new Activity mode and distribution semantics;
+6. derives `cost` and `duration` from Manual Work/Scheduled Cost schedules;
+7. validates the scenario and every Activity;
+8. calculates the imported scenario snapshot; and
+9. commits the scenario and all Activities together only after the complete import is valid.
 
 The import is transactional. Any validation or calculation failure rolls the new scenario back rather than leaving a partially imported Cashflow.
 
-## 11. Relationship to future AI-assisted setup
+## 12. Relationship to calculated totals and reports
+
+Portable JSON stores **inputs**, not the report result.
+
+The backend recalculates canonical totals/KPIs after import. Flutter/Excel should use those authoritative values instead of trusting or reconstructing totals from visibly rounded period arrays where that could create drift.
+
+The portable format therefore remains suitable even when UI/Excel formatting conventions change.
+
+## 13. Relationship to future AI-assisted setup
 
 Future AI-assisted setup may generate this portable input structure as a proposal, but it must follow the same semantic and validation rules as manual input.
 
 AI-generated values must still pass backend validation and be recalculated by the normal CashflowPot engine.
 
-Last reviewed against current q_flow backend and Flutter JSON codec: 13 October 2026.
+Last reviewed against current q_flow backend and Flutter JSON codec: 14 October 2026.
