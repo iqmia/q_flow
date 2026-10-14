@@ -6,6 +6,7 @@ from unittest import TestCase
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = REPO_ROOT / 'site' / 'build_site.py'
+CONTENT_CSS = REPO_ROOT / 'site' / 'static' / 'css' / 'content-pages.css'
 
 
 def _load_builder():
@@ -44,6 +45,29 @@ class CurrentProductSiteTest(TestCase):
                 self.assertIn(token.casefold(), folded)
         finally:
             temp_dir.cleanup()
+
+    def test_home_hero_balances_copy_and_image(self):
+        temp_dir, html = _build_page('index.html')
+        try:
+            self.assertIn('class="hero hero--home"', html)
+            self.assertIn('Turn project execution and financing into a cash-flow forecast.', html)
+            self.assertNotIn(
+                'Turn project execution, contract terms, scheduled costs and financing into a cash-flow forecast.',
+                html,
+            )
+        finally:
+            temp_dir.cleanup()
+
+        css = CONTENT_CSS.read_text(encoding='utf-8')
+        for token in (
+            '.hero--home .split-section',
+            'minmax(0, 0.72fr) minmax(0, 1fr)',
+            '.hero--home h1',
+            'clamp(2.6rem, 4vw, 3.6rem)',
+            '.hero--home .hero__image',
+            'aspect-ratio: 4 / 3',
+        ):
+            self.assertIn(token, css)
 
     def test_how_it_works_includes_scheduled_cost_and_financing_steps(self):
         temp_dir, html = _build_page('how-it-works/index.html')
