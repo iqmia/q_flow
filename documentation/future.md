@@ -2,7 +2,9 @@
 
 This file records directions that have been discussed and approved as useful future work but are **not current product behavior** unless they are later implemented and moved into the current-product documentation.
 
-Keep this list selective. Ideas that were merely discussed, superseded, or rejected should not become roadmap promises here.
+Keep this list selective. Ideas that were merely discussed, superseded, rejected, or already implemented should not remain here as roadmap promises.
+
+Current implemented behavior — including Work vs Scheduled Cost Activities, Independent/Activity-linked inflow, financing facilities, facility KPIs, and the full Excel cashflow sections — belongs in `product.md`, `technical.md`, `ui-ux.md`, and `reference/`.
 
 ## 1. AI-assisted project and scenario setup
 
@@ -14,16 +16,18 @@ Allow a user to describe a construction project in normal language and provide a
 - contract value;
 - expected duration;
 - project type; and
-- any known commercial conditions.
+- known commercial/financing conditions.
 
 AI can then propose a starting cash-flow model for user review, including items such as:
 
-- activity structure;
-- estimated activity cost allocation;
-- activity duration/timing;
-- curve/timing assumptions;
-- subcontracted share; and
-- starting commercial/forecast assumptions where appropriate.
+- Work Activities;
+- Scheduled Cost Activities where appropriate;
+- estimated Activity costs;
+- Activity duration/timing or manual schedules;
+- Work distribution/curve assumptions;
+- subcontracted share;
+- client commercial terms/forecast assumptions; and
+- starting financing-facility definitions when the user asks for funding modelling.
 
 ### Boundary
 
@@ -31,30 +35,47 @@ AI is an **input assistant**, not an alternative cash-flow engine.
 
 The generated proposal must be reviewable/editable by the user. After review, the normal CashflowPot data model, backend validation, and calculation engine remain authoritative.
 
-Portable CashflowPot JSON is a natural machine-readable target for AI-generated scenarios because it already represents scenario inputs rather than calculated results.
+Portable CashflowPot JSON is the natural machine-readable target for AI-generated scenarios because it represents scenario inputs rather than calculated results.
 
-### Preparation before implementation
+### Current preparation status
 
-The AI schema should use semantic user-facing concepts rather than legacy backend names.
+The current data model now separates:
 
-In particular, the current `activity_type` field mixes trade/category meaning with a calculation switch for the exact value `linear`. Before AI-generated models become authoritative, activity/trade category and work-distribution type should be treated as separate semantic concepts even if database compatibility temporarily preserves the old field.
+- Activity category/template (`activity_type`);
+- Activity mode (`work` / `scheduled_cost`); and
+- Work distribution (`s_curve` / `linear` / `manual`).
+
+That separation removes the earlier ambiguity that would have made AI-generated Activity definitions unreliable.
+
+Before AI-assisted setup is shipped, the proposal/review UI should still use semantic user-facing concepts rather than legacy backend names and should make uncertain/guessed inputs obvious to the user.
 
 ## 2. Full scenario report
 
-The current Excel export is a working schedule/output. A future **scenario report** should be a more complete decision document suitable for forwarding to management, employers, banks, lenders, or investment/finance reviewers.
+The current Excel export is a professional working cashflow report with:
+
+- project/scenario identification;
+- contract/key-term context;
+- Activity schedule;
+- key metrics;
+- charts;
+- full Project Cashflow;
+- full Facilities section;
+- Cash Position; and
+- reconciliation/notes.
+
+A future **full scenario report** can go beyond the current workbook and become a more narrative decision document suitable for forwarding to management, employers, banks, lenders, or investment/finance reviewers.
 
 The intended direction includes:
 
-- concise project/scenario identification;
-- contract and key commercial terms;
-- forecasting assumptions;
-- key cash-flow KPIs;
+- concise executive-summary page;
+- clearer separation of inputs, assumptions, forecast results, and interpretation;
 - selected charts on dedicated report/chart sheets where appropriate;
-- an executive-summary style overview;
-- clear distinction between inputs, forecast results, and interpretation; and
-- professional formatting suitable for external circulation.
+- facility utilization/adequacy commentary;
+- scenario comparison summaries;
+- professionally composed print/PDF output; and
+- optional narrative explanation tied to calculated results.
 
-The report should use the existing CashflowPot calculation results and formulas rather than introducing a second calculation model in the export layer.
+The report must use the existing CashflowPot calculation results and formulas rather than introducing a second financial model in the export/report layer.
 
 ## 3. AI-assisted report narrative
 
@@ -64,6 +85,8 @@ Once the scenario report structure is stable, AI may assist with a short narrati
 - when the funding requirement occurs;
 - major timing drivers;
 - effect of retention/payment/WIEB assumptions;
+- facility utilization and residual debt;
+- Cash after debt settlement;
 - sensitivity between compared scenarios; and
 - issues a lender or management reviewer may want to challenge.
 
@@ -73,111 +96,102 @@ Any narrative must remain clearly tied to the calculated scenario and must not p
 
 CashflowPot already supports multiple independent scenarios per project. A future reporting/analysis layer can make scenario comparison more explicit for decisions such as:
 
-- tender/base/current/recovery comparisons;
+- Tender / Base / Current / Recovery comparisons;
 - changed payment terms;
 - alternative subcontract strategies;
-- front-loaded vs back-loaded execution or contract curves; and
+- front-loaded vs back-loaded execution or contract curves;
+- different Scheduled Cost procurement/payment timing;
+- alternative facility structures, limits, or repayment methods; and
 - financing sensitivity.
 
-This should build on the existing scenario model rather than create a separate parallel forecast structure.
+Comparison should build on the existing scenario model rather than create a separate parallel forecast structure.
 
-## 5. Project financing facilities
+Useful future comparison outputs could include:
 
-### Goal
+- delta in peak funding requirement;
+- delta in financing cost;
+- delta in peak facility usage;
+- final outstanding debt;
+- Cash after debt settlement; and
+- period-by-period cash-position differences.
 
-Add a financing layer that helps contractors assess whether a project can be funded, what facilities may be required, and whether those facilities are available in the periods when the project needs them.
+## 5. Financing enhancements beyond the current facility engine
 
-Typical uses include bid/no-bid review, bank-facility planning, facility-adequacy checks, and financing scenario comparison.
+Financing facilities are **current product behavior**, not future work. The current engine already supports scheduled/automatic/PPC-linked draws, revolving/non-revolving limits, multiple repayment methods, interest/fees, facility outstanding, KPIs, and full cashflow presentation.
 
-### Core principle
+Future financing work should therefore be limited to capabilities that are genuinely not implemented.
 
-Keep the model cash-flow-native. CashflowPot does not need supplier, purchase-order, or procurement relationships to model financing.
+### Potential Activity/facility linking
 
-A facility draw is added to project inflow. Principal repayments, fees, and interest are added to project outflow. The model should preserve the project cash position before financing as well as the funded cash position after financing so financing does not hide the underlying project funding requirement.
+A future optional link could associate a financing draw with a Scheduled Cost Activity, for example an LC funding a specific equipment/material payment.
 
-A future facility should have common terms such as:
+The purpose would be traceability/convenience, not a new financial model. The link must not double-count cash:
 
-- facility type/name;
-- availability start and end;
-- limit;
-- fees;
-- interest/cost; and
-- outstanding principal/capacity.
+- Scheduled Cost remains project outflow;
+- facility draw remains financing inflow.
 
-For a limited facility, available capacity is based on the facility limit less outstanding principal, where outstanding principal is principal drawn minus principal repaid.
+CashflowPot should not infer procurement relationships unless the user explicitly creates the link.
 
-### Facility setup and calculation rules
+### Guarantee-only / non-cash facilities
 
-The user selects a suggested facility model or creates a custom one. A preset supplies editable defaults; it does not lock the facility to a product-specific calculation. Each saved facility has a user-defined name for its cashflow rows, a product type, draw method, repayment method, availability start/end, limit, fees, interest rate, and revolving setting. Method-specific inputs include a scheduled draw/repayment table, PPC advance/repayment percentages, equal-installment start/interval/count, or sweep priority.
+A guarantee-only LC currently stays outside cashflow because no cash draw occurs.
 
-Draw methods:
+A future facility/exposure layer could track non-cash guarantees, bonds, or contingent limits separately from cashflow without pretending they are cash receipts.
 
-- **Automatic shortfall:** draw only to cover a negative funded cash position, within availability and remaining capacity. OD draws run before calculated contractor/owner contribution, which covers the residual shortfall.
-- **Scheduled:** draw the entered amount in the entered period. CashflowPot does not infer LC or equipment timing from activities. A draw above remaining capacity is capped and the undrawn amount is reported.
-- **PPC base:** draw the configured share of the net PPC certificate in its issue period, capped by remaining capacity. PPC repayments use employer PPC receipts after the project payment delay.
+### Explicit facility maturity / post-horizon closeout
 
-One repayment method applies to each facility:
+The current model does not infer facility maturity or invent future interest beyond the modeled horizon.
 
-- **Cashflow sweep:** repay from positive cash after all other period flows. This is the only repayment method that depends on available cash. If several facilities use it, apply their user-editable priority order; when no order is saved, the higher interest rate is repaid first.
-- **Percent of PPC:** apply the configured percentage to that period's employer PPC receipts, even if the repayment makes cash negative.
-- **Equal installments:** divide total principal drawn by the configured payment count and pay on the configured start period and interval. Pay the installment even if cash becomes negative.
-- **Scheduled:** pay the entered amount in that period, up to principal outstanding, even if cash becomes negative.
+A future enhancement could let the user specify maturity/balloon repayment or request an explicit debt-closeout extension of the model horizon.
 
-Every draw is an inflow row; principal repayment is an outflow row; fees and interest are separate outflow rows. Available capacity is `limit - outstanding principal` for revolving facilities and `limit - total principal drawn` for non-revolving facilities. Outstanding principal is `total drawn - total principal repaid`.
+This must remain user-driven because bank terms differ materially.
 
-The current backend convention charges a one-time facility fee in its availability start period and calculates interest each period on the opening principal balance. Interest is a cash outflow, not capitalized directly into that facility's principal. If cash is insufficient, automatic shortfall facilities may fund that cost according to their draw rules.
+### Facility adequacy analysis
 
-The initial editable suggestions are:
+A future analysis layer can explain whether facilities are adequate by:
 
-| Facility type | Draw default | Repayment default |
-|---|---|---|
-| Letter of Credit | Scheduled | Percent of PPC |
-| Overdraft | Automatic shortfall | Cashflow sweep |
-| PPC Discount | PPC base | Percent of PPC |
-| Working Capital | Scheduled | Percent of PPC |
-| Equipment Loan | Scheduled | Scheduled |
-| Owner's Injection | Automatic shortfall | Cashflow sweep |
-| Other | Scheduled | Cashflow sweep |
+- amount;
+- timing;
+- availability window;
+- revolving capacity;
+- repayment timing; and
+- residual unfunded shortfall.
 
-A guarantee-only LC has no cash draw and stays outside the cashflow calculation. If the bank pays a supplier, enter the funded amount as a scheduled LC draw and model repayment using the selected method.
+This should explain the existing engine result rather than create a different calculation.
 
-### Intended outputs
+## 6. Public-site / educational expansion
 
-The financing layer should eventually show at least:
+The current public site explains CashflowPot and its methodology. Future content can expand with practical construction-commercial examples such as:
 
-- project cash position before financing;
-- facility draws and repayments;
-- funded cash position;
-- peak underlying funding need and when it occurs;
-- utilization and remaining capacity by facility;
-- total financing cost; and
-- any remaining unfunded shortfall.
+- how WIEB changes cash timing;
+- Work vs Scheduled Cost examples;
+- client payment-delay scenarios;
+- overdraft vs PPC Discount vs LC examples;
+- revolving vs non-revolving capacity; and
+- bid/no-bid financing checks.
 
-Facility adequacy should be judged by **amount, timing, availability, and outstanding capacity**, not simply by adding nominal facility limits.
+Any educational examples must stay consistent with the current calculation references and avoid presenting illustrative defaults as universal practice.
 
-### Implementation sequence and remaining work
-
-The approved sequence is Python calculation/API first, Flutter facility editing second, and Excel report rows last. The calculation must expose pre-financing cash, facility draws, principal repayments, interest, fees, balances, available capacity, and any unfunded shortfall. The current Excel workbook is print-formatted for A4 landscape and A3; facility rows must preserve its existing column widths and scaling.
-
-Backend conventions above make the period loop deterministic. They should be revisited only if bank negotiations require different terms. Guarantee-only LC capacity/fees, additional facility types, and sensitivity/report presentation can be addressed separately.
-
-## 6. Not an assumed roadmap item
+## 7. Not an assumed roadmap item
 
 The following is **not** an approved default future direction:
 
-- per-activity selling values;
-- per-activity markup allocation; or
+- per-Activity selling values;
+- per-Activity markup allocation; or
 - a detailed Schedule of Values model.
 
-The current Independent contract curve deliberately separates main-contract value timing from activity cost allocation. Do not reintroduce an old “activity-specific selling value and markup allocation” roadmap statement without a new product decision.
+The current Independent contract curve deliberately separates main-contract value timing from Activity cost allocation. Do not reintroduce an old “Activity-specific selling value and markup allocation” roadmap statement without a new product decision.
 
-## 7. How ideas graduate from future to current
+Likewise, CashflowPot is not assumed to evolve into a replacement for Primavera/MS Project, ERP, accounting, detailed BOQ measurement, or resource-loaded planning software.
+
+## 8. How ideas graduate from future to current
 
 When a future item is implemented:
 
 1. update the relevant current-product document (`product.md`, `technical.md`, `ui-ux.md`, or `deployment.md`);
 2. update any affected detailed reference;
 3. add/adjust regression tests;
-4. remove or rewrite the item here so `future.md` does not describe an already-live feature as future work.
+4. update portable JSON documentation if the source format changes; and
+5. remove or rewrite the item here so `future.md` does not describe already-live behavior as future work.
 
-Last reviewed: 7 October 2026.
+Last reviewed: 14 October 2026.
