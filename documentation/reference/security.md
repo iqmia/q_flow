@@ -225,10 +225,18 @@ Tests should mock QAuth at the application boundary when validating QAuth behavi
 9. Documentation must not instruct the frontend to store backend signing secrets or the backend `APP_SECRET`.
 10. Changes to QAuth token claims, application identity, or Unit permission semantics must update this reference and the corresponding tests together.
 
-## 12. Historical note
+## 12. Relationship to current financial-model changes
+
+Activity modes, Scheduled Cost, financing facilities, KPI additions, and Excel/report changes do not alter the authentication or Unit-authorization trust boundaries described here.
+
+Facility/scenario definitions are still protected Cashflow data owned by the same QAuth Unit context and remain subject to the same `view:cashflow` / `edit:cashflow` authorization checks as other scenario data.
+
+No facility secret, bank credential, or backend signing key is introduced into the Flutter client by the financing model.
+
+## 13. Historical note
 
 An older security document described an `app_key` shared with the frontend and a simpler token flow. That is not the current q_flow implementation.
 
 The current backend uses an application JWT in `client-app-id`, signed server-side with `APP_SECRET`, verifies QAuth user tokens with `PUBLIC_KEY`, binds them to the `APP_ID` audience/application, and authorizes project access through QAuth Unit permissions.
 
-Last reviewed against current `q_flow/services/user_api.py`, `decorators.py`, and `services/units.py`: 7 October 2026.
+Last reviewed against current `q_flow/services/user_api.py`, `decorators.py`, and `services/units.py`: 14 October 2026.
