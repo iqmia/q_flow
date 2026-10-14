@@ -285,4 +285,6 @@ systemctl status cashflowpot-qflow
 9. `robots.txt`, `sitemap.xml`, and `llms.txt` are generated public-site files; `/app/` stays crawlable/non-indexable and `/api/` stays outside discovery.
 10. Server secrets and persistent data are not source-controlled deployment artifacts.
 
-Last reviewed: 11 October 2026.
+The Activity-mode, Scheduled Cost, financing-facility, and Excel-report updates do not change this deployment topology.
+
+Last reviewed: 14 October 2026.
