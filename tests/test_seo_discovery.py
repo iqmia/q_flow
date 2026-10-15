@@ -12,22 +12,22 @@ BUILD_SCRIPT = REPO_ROOT / 'site' / 'build_site.py'
 EXPECTED = {
     'index.html': (
         'Construction Cash-Flow Simulation & Forecasting | CashflowPot',
-        'Simulate construction project cash flow from execution timing, contract terms and forecasting assumptions for tendering, financing, lender review, budgeting and project reforecasting.',
+        'Simulate construction project cash flow from Work activities, Scheduled Cost, contract terms and financing facilities for tendering, lender review, funding and project reforecasting.',
         'https://cashflowpot.com/',
     ),
     'how-it-works/index.html': (
         'How CashflowPot Works | Construction Cash-Flow Forecasting',
-        'See how CashflowPot combines execution timing, contract terms and assumptions to simulate construction project inflow, outflow, working capital and funding requirements.',
+        'See how CashflowPot combines Work activities, Scheduled Cost, client terms and financing facilities into Project Cashflow, Facilities and Cash Position.',
         'https://cashflowpot.com/how-it-works/',
     ),
     'methodology/index.html': (
         'CashflowPot Methodology | Construction Cash-Flow Model',
-        'Understand how CashflowPot separates execution, contract terms and forecasting assumptions to calculate project inflow, outflow, net cash and funding requirements.',
+        'Understand Work versus Scheduled Cost, client PPC timing, facility capacity, funding requirement, cash position and debt-settlement metrics in CashflowPot.',
         'https://cashflowpot.com/methodology/',
     ),
     'about/index.html': (
         'About CashflowPot | Construction Cash-Flow Simulation',
-        'CashflowPot is a focused construction cash-flow simulation and forecasting product for tendering, financing, lender review, portfolio capacity and project reforecasting.',
+        'CashflowPot is a construction cash-flow simulation and financing decision product for tendering, contractor funding, lender review and project reforecasting.',
         'https://cashflowpot.com/about/',
     ),
     'contact/index.html': (
@@ -122,7 +122,17 @@ class StructuredDataTest(TestCase):
         self.assertEqual(software['applicationCategory'], 'BusinessApplication')
         self.assertEqual(software['operatingSystem'], 'Web')
         features = ' '.join(software['featureList']).casefold()
-        for term in ('scenario forecasting', 'activity-based outflow', 'independent contract curve', 'activity-linked inflow', 'working capital', 'excel export'):
+        for term in (
+            'scenario forecasting',
+            'work activity forecasting',
+            'scheduled cost forecasting',
+            'independent contract curve',
+            'activity-linked inflow',
+            'financing facilities',
+            'working capital',
+            'cash after debt settlement',
+            'excel export',
+        ):
             self.assertIn(term, features)
         self.assertNotIn('offers', {key.casefold() for key in software})
 
@@ -177,7 +187,9 @@ class DiscoveryFilesTest(TestCase):
             self.assertNotIn(forbidden, sitemap)
 
         folded = llms.casefold()
-        self.assertIn('construction cash-flow simulation and forecasting', folded)
+        self.assertIn('construction cash-flow simulation and financing product', folded)
+        self.assertIn('scheduled cost', folded)
+        self.assertIn('financing facilities', folded)
         for url in (
             'https://cashflowpot.com/',
             'https://cashflowpot.com/how-it-works/',
