@@ -29,11 +29,15 @@ def test_homepage_specific_scale_outranks_later_generic_hero_rules():
     assert '.hero.hero--home .split-section' in text
     assert 'grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr)' in text
     assert '.hero.hero--home h1' in text
-    assert 'font-size: clamp(2.6rem, 3.35vw, 3.35rem)' in text
+    assert 'font-size: 3rem' in text
+    assert '@media (max-width: 1152px)' in text
+    assert 'font-size: clamp(2.6rem, 4.2vw, 3rem)' in text
+    assert '@media (max-width: 640px)' in text
+    assert 'font-size: clamp(2.15rem, 9vw, 2.55rem)' in text
     assert '.hero.hero--home .hero__image' in text
     assert 'aspect-ratio: 4 / 3' in text
     assert text.count('.hero.hero--home .split-section') >= 2
-    assert text.count('.hero.hero--home h1') >= 2
+    assert text.count('.hero.hero--home h1') >= 3
 
 
 def test_responsive_scale_targets_shared_heroes_and_caps_heading():
@@ -51,6 +55,8 @@ def test_responsive_scale_keeps_tablet_and_mobile_compact():
     assert '@media (max-width: 900px)' in text
     assert '@media (max-width: 900px)' in content
     assert '@media (max-width: 640px)' in text
+    assert '@media (max-width: 640px)' in content
     assert 'font-size: clamp(2.15rem, 9vw, 2.55rem)' in text
+    assert 'font-size: clamp(2.15rem, 9vw, 2.55rem)' in content
     assert '.hero.hero--home .split-section' in content
     assert 'grid-template-columns: 1fr' in content
