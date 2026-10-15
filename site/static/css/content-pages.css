@@ -194,7 +194,7 @@
 .hero.hero--home h1 {
   max-width: 620px;
   margin-bottom: 20px;
-  font-size: clamp(2.6rem, 3.35vw, 3.35rem);
+  font-size: 3rem;
 }
 
 .hero.hero--home .hero__lead {
@@ -208,6 +208,12 @@
 .hero.hero--home .hero__image {
   aspect-ratio: 4 / 3;
   min-height: 0;
+}
+
+@media (max-width: 1152px) {
+  .hero.hero--home h1 {
+    font-size: clamp(2.6rem, 4.2vw, 3rem);
+  }
 }
 
 @media (max-width: 900px) {
@@ -247,6 +253,12 @@
 
   .contact-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero.hero--home h1 {
+    font-size: clamp(2.15rem, 9vw, 2.55rem);
   }
 }
 
