@@ -29,7 +29,7 @@ class HowItWorksPageTest(TestCase):
         self.assertIn('<link rel="canonical" href="https://cashflowpot.com/how-it-works/">', html)
         self.assertIn('From the project information you know to the cash decision you need.', html)
 
-    def test_page_explains_the_six_step_workflow(self):
+    def test_page_explains_the_seven_step_workflow(self):
         module = _load_builder()
         with tempfile.TemporaryDirectory() as temp_dir:
             output = module.build_site(Path(temp_dir) / 'site-output')
@@ -38,9 +38,10 @@ class HowItWorksPageTest(TestCase):
         for heading in (
             'Define the project',
             'Set the inflow forecast method',
-            'Build the activity forecast',
+            'Build Work activities and Scheduled Cost',
             'Apply contract terms and assumptions',
-            'Review the forecast',
+            'Add financing facilities',
+            'Review Project Cashflow, Facilities and Cash Position',
             'Revise scenarios and export',
         ):
             self.assertIn(heading, html)
@@ -53,8 +54,10 @@ class HowItWorksPageTest(TestCase):
             'Payment period',
             'WIEB',
             'subcontracted share',
-            'Peak negative cash',
+            'Scheduled Cost',
+            'Peak Funding Requirement',
             'working capital',
+            'Cash after Debt Settlement',
             'lender review',
             'mid-project reforecast',
         ):
