@@ -20,14 +20,20 @@ def test_homepage_uses_refreshed_split_section_hero_layout():
     assert 'class="site-shell split-section"' in text
 
 
-def test_homepage_specific_scale_gives_image_more_visual_weight():
+def test_homepage_specific_scale_outranks_later_generic_hero_rules():
+    base = BASE.read_text(encoding='utf-8')
     text = CONTENT_CSS.read_text(encoding='utf-8')
-    assert '.hero--home .split-section' in text
+
+    assert base.index('/assets/css/content-pages.css') < base.index('/assets/css/responsive-scale.css')
+    assert '.hero.hero--home {' in text
+    assert '.hero.hero--home .split-section' in text
     assert 'grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr)' in text
-    assert '.hero--home h1' in text
+    assert '.hero.hero--home h1' in text
     assert 'font-size: clamp(2.6rem, 4vw, 3.6rem)' in text
-    assert '.hero--home .hero__image' in text
+    assert '.hero.hero--home .hero__image' in text
     assert 'aspect-ratio: 4 / 3' in text
+    assert text.count('.hero.hero--home .split-section') >= 2
+    assert text.count('.hero.hero--home h1') >= 2
 
 
 def test_responsive_scale_targets_shared_heroes_and_caps_heading():
@@ -46,5 +52,5 @@ def test_responsive_scale_keeps_tablet_and_mobile_compact():
     assert '@media (max-width: 900px)' in content
     assert '@media (max-width: 640px)' in text
     assert 'font-size: clamp(2.15rem, 9vw, 2.55rem)' in text
-    assert '.hero--home .split-section' in content
+    assert '.hero.hero--home .split-section' in content
     assert 'grid-template-columns: 1fr' in content
