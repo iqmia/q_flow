@@ -31,7 +31,7 @@ class MethodologyPageTest(TestCase):
         self.assertIn('<title>CashflowPot Methodology | Construction Cash-Flow Model</title>', html)
         self.assertIn('<link rel="canonical" href="https://cashflowpot.com/methodology/">', html)
         self.assertIn('A forecast designed to be revised', html)
-        self.assertIn('minutes, not weeks', html)
+        self.assertIn('quick to revise when the project changes', html)
 
     def test_page_follows_current_calculation_sequence(self):
         html = self._html()
@@ -40,18 +40,20 @@ class MethodologyPageTest(TestCase):
             'Main-contract inflow',
             'Independent contract curve',
             'Activity-linked inflow',
-            'Execution and outflow',
+            'Work Activity outflow',
+            'Scheduled Cost outflow',
+            'Financing facilities',
             'Cash position',
             'Contract-value work',
-            'Project outflow',
-            'financing rate',
+            'Project Cashflow',
         ):
             self.assertIn(concept, html)
 
         for formula in (
-            'Value factor = Contract value / Total entered activity cost',
-            'Net cash flow = Inflow − Outflow',
-            'Σ Activity outflow = Activity estimated cost',
+            'Value factor = Contract value / Total Work Activity cost',
+            'Net cash flow = Total inflow − Total outflow',
+            'Σ Work Activity outflow = Work Activity estimated cost',
+            'Σ Scheduled Cost outflow = Scheduled Cost total',
         ):
             self.assertIn(formula, html)
 
@@ -64,14 +66,14 @@ class MethodologyPageTest(TestCase):
         self.assertIn('carry part of each period', html)
         self.assertIn('into the next period', html)
         self.assertIn('Direct cost is paid as incurred', html)
-        self.assertIn('WIEB changes timing, not the lifetime value of the work', html)
+        self.assertIn('WIEB changes timing, not lifetime value', html)
 
     def test_page_explains_activity_linked_value_factor_without_sov_roadmap(self):
         html = self._html()
 
-        self.assertIn('combined activity cost-work profile is scaled proportionally to the contract value', html)
-        self.assertIn('Neither method tries to infer activity selling prices, markup allocation or a Schedule of Values', html)
-        self.assertIn('common factor describes the project-level profile', html)
+        self.assertIn('combined Work Activity cost-work profile is scaled proportionally to contract value', html)
+        self.assertIn('Neither method assigns individual selling prices or a Schedule of Values to Activities', html)
+        self.assertIn('Scheduled Cost is excluded from both the Work-cost denominator and the contract-value work profile', html)
         self.assertNotIn('Activity-specific selling value and markup allocation', html)
         self.assertNotIn('planned extension', html)
 
@@ -79,8 +81,10 @@ class MethodologyPageTest(TestCase):
         html = self._html()
 
         for invariant in (
-            'Σ Activity work = Activity estimated cost',
-            'Σ Activity outflow = Activity estimated cost',
+            'Σ Work Activity work = Work Activity estimated cost',
+            'Σ Work Activity outflow = Work Activity estimated cost',
+            'Σ Scheduled Cost work = 0',
+            'Σ Scheduled Cost outflow = Scheduled Cost total',
             'Σ Project inflow = Contract value',
         ):
             self.assertIn(invariant, html)
