@@ -49,10 +49,10 @@ class PublicManifestTest(TestCase):
         )
         self.assertFalse((output / "assets" / "icons").exists())
 
-    def test_shared_head_uses_app_favicon_and_public_manifest(self):
+    def test_shared_head_uses_site_favicon_and_public_manifest(self):
         template = BASE_TEMPLATE.read_text(encoding="utf-8")
         for token in (
-            'rel="icon" type="image/png" href="/app/favicon.png"',
+            'rel="icon" type="image/png" sizes="192x192" href="/favicon.png"',
             'rel="apple-touch-icon" href="/app/icons/Icon-192.png"',
             'rel="manifest" href="/assets/manifest.json"',
             'name="theme-color" content="#E89A5B"',
