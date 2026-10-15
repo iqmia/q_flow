@@ -3,21 +3,34 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CSS = ROOT / "site" / "static" / "css" / "responsive-scale.css"
+CONTENT_CSS = ROOT / "site" / "static" / "css" / "content-pages.css"
 BASE = ROOT / "site" / "templates" / "base.html"
 HOME = ROOT / "site" / "templates" / "index.html"
 
 
 def test_shared_template_loads_responsive_scale_css():
-    assert '/assets/css/responsive-scale.css' in BASE.read_text(encoding='utf-8')
+    text = BASE.read_text(encoding='utf-8')
+    assert '/assets/css/content-pages.css' in text
+    assert '/assets/css/responsive-scale.css' in text
 
 
-def test_homepage_uses_split_section_hero_layout():
+def test_homepage_uses_refreshed_split_section_hero_layout():
     text = HOME.read_text(encoding='utf-8')
-    assert '<section class="hero">' in text
+    assert '<section class="hero hero--home">' in text
     assert 'class="site-shell split-section"' in text
 
 
-def test_responsive_scale_targets_real_homepage_hero_and_caps_heading():
+def test_homepage_specific_scale_gives_image_more_visual_weight():
+    text = CONTENT_CSS.read_text(encoding='utf-8')
+    assert '.hero--home .split-section' in text
+    assert 'grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr)' in text
+    assert '.hero--home h1' in text
+    assert 'font-size: clamp(2.6rem, 4vw, 3.6rem)' in text
+    assert '.hero--home .hero__image' in text
+    assert 'aspect-ratio: 4 / 3' in text
+
+
+def test_responsive_scale_targets_shared_heroes_and_caps_heading():
     text = CSS.read_text(encoding='utf-8')
     assert '.hero .split-section' in text
     assert 'grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr)' in text
@@ -28,6 +41,10 @@ def test_responsive_scale_targets_real_homepage_hero_and_caps_heading():
 
 def test_responsive_scale_keeps_tablet_and_mobile_compact():
     text = CSS.read_text(encoding='utf-8')
+    content = CONTENT_CSS.read_text(encoding='utf-8')
     assert '@media (max-width: 900px)' in text
+    assert '@media (max-width: 900px)' in content
     assert '@media (max-width: 640px)' in text
     assert 'font-size: clamp(2.15rem, 9vw, 2.55rem)' in text
+    assert '.hero--home .split-section' in content
+    assert 'grid-template-columns: 1fr' in content
