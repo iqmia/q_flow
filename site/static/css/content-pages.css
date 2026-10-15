@@ -194,7 +194,7 @@
 .hero.hero--home h1 {
   max-width: 620px;
   margin-bottom: 20px;
-  font-size: clamp(2.6rem, 4vw, 3.6rem);
+  font-size: clamp(2.6rem, 3.35vw, 3.35rem);
 }
 
 .hero.hero--home .hero__lead {
