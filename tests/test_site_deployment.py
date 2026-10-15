@@ -45,6 +45,22 @@ class SiteDeploymentTest(TestCase):
             self.assertEqual((web_root / 'api' / 'keep.txt').read_text(encoding='utf-8'), 'keep')
             self.assertEqual((web_root / 'unrelated.txt').read_text(encoding='utf-8'), 'keep')
 
+    def test_publish_copies_app_icon_to_root_favicon(self):
+        module = _load_builder()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            build = module.build_site(root / 'dist')
+            web_root = root / 'www.cashflowpot.com'
+            icon_path = web_root / 'app' / 'icons' / 'Icon-192.png'
+            icon_path.parent.mkdir(parents=True)
+            icon_bytes = b'cashflowpot-icon'
+            icon_path.write_bytes(icon_bytes)
+
+            module.publish_site(build, web_root)
+
+            self.assertEqual((web_root / 'favicon.png').read_bytes(), icon_bytes)
+            self.assertEqual(icon_path.read_bytes(), icon_bytes)
+
     def test_publish_requires_existing_web_root(self):
         module = _load_builder()
         with tempfile.TemporaryDirectory() as temp_dir:
