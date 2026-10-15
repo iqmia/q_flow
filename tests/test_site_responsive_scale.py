@@ -29,7 +29,7 @@ def test_homepage_specific_scale_outranks_later_generic_hero_rules():
     assert '.hero.hero--home .split-section' in text
     assert 'grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr)' in text
     assert '.hero.hero--home h1' in text
-    assert 'font-size: clamp(2.6rem, 4vw, 3.6rem)' in text
+    assert 'font-size: clamp(2.6rem, 3.35vw, 3.35rem)' in text
     assert '.hero.hero--home .hero__image' in text
     assert 'aspect-ratio: 4 / 3' in text
     assert text.count('.hero.hero--home .split-section') >= 2
