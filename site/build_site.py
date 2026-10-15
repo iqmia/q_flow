@@ -17,6 +17,8 @@ ORGANIZATION_ID = f'{SITE_ORIGIN}/#organization'
 WEBSITE_ID = f'{SITE_ORIGIN}/#website'
 SOFTWARE_ID = f'{SITE_ORIGIN}/#software'
 ROOT_DISCOVERY_FILES = ('robots.txt', 'sitemap.xml', 'llms.txt')
+SITE_FAVICON_NAME = 'favicon.png'
+APP_FAVICON_SOURCE = Path('app/icons/Icon-192.png')
 QUOLLNET_SOCIAL_URLS = (
     'https://www.facebook.com/people/Quollnet/100086014988886/',
     'https://www.instagram.com/quollnet/',
@@ -271,6 +273,19 @@ def _managed_publish_entries() -> tuple[str, ...]:
     return tuple(sorted(entries))
 
 
+def _publish_site_favicon(target_root: Path) -> None:
+    source = target_root / APP_FAVICON_SOURCE
+    if not source.is_file():
+        return
+
+    target = target_root / SITE_FAVICON_NAME
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+    elif target.is_dir():
+        shutil.rmtree(target)
+    shutil.copy2(source, target)
+
+
 def publish_site(build_dir: Path, web_root: Optional[Path] = None) -> Path:
     source_root = Path(build_dir)
     target_root = Path(web_root) if web_root is not None else DEFAULT_WEB_ROOT
@@ -294,6 +309,7 @@ def publish_site(build_dir: Path, web_root: Optional[Path] = None) -> Path:
             shutil.copytree(source, target)
         else:
             shutil.copy2(source, target)
+    _publish_site_favicon(target_root)
     return target_root
 
 
