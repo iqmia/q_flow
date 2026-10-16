@@ -22,15 +22,17 @@ This repository owns:
 - the authoritative Cashflow/Activity calculation engine;
 - Work vs Scheduled Cost Activity semantics;
 - Independent and Activity-linked client inflow calculations;
-- financing-facility calculation and validation;
+- financing-facility calculation, validation, and atomic facility operations;
 - canonical scenario summary/KPI values;
 - local Cashflow/Activity persistence;
 - QAuth project/unit integration;
-- portable scenario import handling;
+- canonical portable scenario import **and export**;
+- backend Excel report generation for API/MCP use;
+- stateless short-lived signed Excel download links;
 - backend tests; and
 - the static public-site source and publisher under `site/`.
 
-The Flutter application is maintained separately in `iqmia/cashflowpot`. Flutter owns user-facing input/presentation, charts, portable export/import UX, and Excel reporting, but the backend remains authoritative for the financial model.
+The Flutter application is maintained separately in `iqmia/cashflowpot`. Flutter owns user-facing input/presentation, charts, portable export/import UX, and its existing client-side Excel download UX. The Python backend report mirrors that approved workbook/report design so non-Flutter clients such as MCP can produce the same CashflowPot report without duplicating financial calculations.
 
 ## Current financial model at a glance
 
@@ -62,12 +64,23 @@ See the canonical references for exact formulas and facility sequencing.
 ## Public surfaces
 
 ```text
-cashflowpot.com/      static public website generated from site/
+cashflowpot.com/      static public website
 cashflowpot.com/app/  Flutter application
 cashflowpot.com/api/  q_flow Flask API through Apache + Gunicorn
 ```
 
 Apache exposes the public `/api/` prefix and reverse-proxies to Gunicorn on `127.0.0.1:5002`; Flask routes remain internally unprefixed.
+
+The Excel export flow is stateless:
+
+```text
+POST /api/cashflow/<cashflow_id>/excel-export
+    -> short-lived signed download URL
+GET  /api/exports/cashflow/<signed-token>.xlsx
+    -> build workbook in memory and stream it
+```
+
+Generated `.xlsx` files are not persisted on the server.
 
 ## Public-site commands
 
