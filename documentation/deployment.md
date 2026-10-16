@@ -30,6 +30,8 @@ Production runs on the iqmia VPS under the Virtualmin account `cashflowpot`.
 
 The web root contains the generated public website plus the separately deployed Flutter app under `/app/`.
 
+Generated Excel reports are **not** deployment or storage artifacts. q_flow builds them in memory only when an authorized signed download URL is opened.
+
 ## 3. API runtime
 
 Gunicorn runs the Flask application from the repository `wsgi.py` entrypoint and listens only on loopback:
@@ -43,6 +45,8 @@ The service is managed by systemd as:
 ```text
 cashflowpot-qflow.service
 ```
+
+The `cashflowpot.service` alias can also be used where it has been installed.
 
 Representative unit settings:
 
@@ -152,7 +156,7 @@ The public site also publishes Open Graph metadata, JSON-LD, and the shared soci
 
 ## 7. Shared app assets
 
-The public site reuses selected Flutter-owned assets through absolute `/app/...` paths, including the favicon and icons. The public site and Flutter app therefore share the production domain but remain separate deployment artifacts.
+The public site reuses selected Flutter-owned assets through absolute `/app/...` paths, including icons. The public site and Flutter app therefore share the production domain but remain separate deployment artifacts.
 
 There are intentionally two manifests:
 
@@ -187,9 +191,12 @@ A normal backend code update is:
 cd /home/cashflowpot/q_flow
 git pull
 source /home/cashflowpot/venv/bin/activate
-systemctl restart cashflowpot-qflow
-systemctl status cashflowpot-qflow
+pip install -r requirements.txt
+sudo systemctl restart cashflowpot
+sudo systemctl status cashflowpot
 ```
+
+Installing requirements is required when the backend Excel exporter is introduced because q_flow now depends on `XlsxWriter`.
 
 The health check is:
 
@@ -211,7 +218,7 @@ Production configuration reads `env.json` from:
 /home/cashflowpot/q_flow/env.json
 ```
 
-It is not committed and should be readable only by the application account. Production secrets, mail credentials, QAuth secrets, and database credentials must remain outside Git.
+It is not committed and should be readable only by the application account. Production secrets, mail credentials, QAuth secrets, database credentials, and Flask signing secrets must remain outside Git.
 
 The main runtime database setting is:
 
@@ -219,9 +226,45 @@ The main runtime database setting is:
 DATABASE_URL
 ```
 
-The production value uses PostgreSQL through psycopg. Do not print or commit the full connection URL because it includes credentials.
+The backend export feature also uses:
 
-## 11. Database and storage
+```text
+PUBLIC_API_BASE_URL=https://cashflowpot.com/api
+EXCEL_EXPORT_TOKEN_TTL_SECONDS=600
+```
+
+`PUBLIC_API_BASE_URL` must be the externally visible API base, not Gunicorn's loopback URL, because Apache strips `/api/` before requests reach Flask. `EXCEL_EXPORT_TOKEN_TTL_SECONDS` defaults to 600 seconds when omitted.
+
+The signed Excel token uses the Flask `SECRET_KEY`; changing that key invalidates outstanding download URLs. The URL is a short-lived bearer capability, so it should not be logged or shared beyond the intended recipient.
+
+The production database value uses PostgreSQL through psycopg. Do not print or commit the full connection URL because it includes credentials.
+
+## 11. Stateless Excel export
+
+The public flow is:
+
+```text
+POST https://cashflowpot.com/api/cashflow/<cashflow_id>/excel-export
+  Authorization: Bearer <normal CashflowPot app/unit token>
+
+        -> filename
+        -> download_url
+        -> expires_at
+
+GET <download_url>
+        -> verify signed token
+        -> confirm active cashflow + exact project/unit match
+        -> load current authoritative scenario
+        -> generate XLSX in memory
+        -> stream attachment
+        -> release memory
+```
+
+The GET route intentionally does not require an Authorization header because possession of the short-lived signed URL is the download authorization. The token contains the cashflow identity, project/unit identity, project name, purpose/audience, and expiry.
+
+No `.xlsx` file, export database row, background cleanup task, or temporary report directory is created. Reopening a valid URL can regenerate the workbook until the token expires.
+
+## 12. Database and storage
 
 Production uses PostgreSQL. SQLAlchemy takes the connection from `DATABASE_URL`.
 
@@ -233,9 +276,9 @@ The production application storage directory is:
 
 If `DATABASE_URL` is absent, q_flow can still fall back to SQLite for local/test-compatible operation, but production should use PostgreSQL.
 
-Persistent database data and stored project files are not deployment artifacts and must never be overwritten by `git pull` or the public-site builder.
+Persistent database data and stored project files are not deployment artifacts and must never be overwritten by `git pull` or the public-site builder. Excel exports do not add persistent files to this directory.
 
-## 12. Deployment verification
+## 13. Deployment verification
 
 Before deployment, run the backend suite locally:
 
@@ -269,10 +312,12 @@ https://cashflowpot.com/api/health
 Also confirm the systemd service is running:
 
 ```bash
-systemctl status cashflowpot-qflow
+systemctl status cashflowpot
 ```
 
-## 13. Deployment rules
+For Excel, create a signed URL through the authenticated POST route and open it before expiry. Confirm the response MIME type is XLSX and that no `.xlsx` file appears under `main_storage`.
+
+## 14. Deployment rules
 
 1. `site/dist/` is generated output and is not committed.
 2. `python site/build_site.py` means build + publish to `/home/cashflowpot/public_html`.
@@ -280,11 +325,13 @@ systemctl status cashflowpot-qflow
 4. Never clean/delete the entire Virtualmin document root during a site publish.
 5. `/app/` is owned by the Flutter deployment and must be preserved.
 6. Apache owns the public `/api/` mapping; Flask routes remain internally unprefixed.
-7. Gunicorn listens on loopback only and is managed by `cashflowpot-qflow.service`.
+7. Gunicorn listens on loopback only and is managed by the CashflowPot q_flow systemd service.
 8. Production uses PostgreSQL via `DATABASE_URL` and file storage under `main_storage`.
 9. `robots.txt`, `sitemap.xml`, and `llms.txt` are generated public-site files; `/app/` stays crawlable/non-indexable and `/api/` stays outside discovery.
 10. Server secrets and persistent data are not source-controlled deployment artifacts.
+11. Excel download URLs are short-lived signed capabilities; generated workbooks are in-memory only and must not be added to persistent storage.
+12. `PUBLIC_API_BASE_URL` must stay aligned with the externally visible Apache `/api` URL.
 
-The Activity-mode, Scheduled Cost, financing-facility, and Excel-report updates do not change this deployment topology.
+The Activity-mode, Scheduled Cost, financing-facility, and backend Excel-report updates do not change the core CashflowPot deployment topology.
 
-Last reviewed: 14 October 2026.
+Last reviewed: 17 October 2026.
