@@ -41,6 +41,20 @@ class Config(object):
     EXCEL_EXPORT_TOKEN_TTL_SECONDS = int(
         data.get('EXCEL_EXPORT_TOKEN_TTL_SECONDS', 600)
     )
+    # The Flutter app remains the source of the approved CashflowPot report
+    # logo. In production its bundled asset is already deployed below /app.
+    # Missing logo files are tolerated so local/backend-only installs still
+    # generate a valid workbook.
+    DEFAULT_EXCEL_LOGO_PATH = path.join(
+        path.dirname(BASE_DIR),
+        'public_html',
+        'app',
+        'assets',
+        'assets',
+        'icon',
+        'qflow_logo.png',
+    )
+    EXCEL_LOGO_PATH = data.get('EXCEL_LOGO_PATH', DEFAULT_EXCEL_LOGO_PATH)
 
     # Email settings
     MAIL_SERVER = 'premium106.web-hosting.com'
@@ -89,6 +103,7 @@ class LocalConfig(Config):
             Config.EXCEL_EXPORT_TOKEN_TTL_SECONDS,
         )
     )
+    EXCEL_LOGO_PATH = data.get('EXCEL_LOGO_PATH', Config.EXCEL_LOGO_PATH)
 
     SECRET_KEY = data.get('SECRET_KEY', Config.SECRET_KEY)
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', Config.MAIL_PASSWORD)
