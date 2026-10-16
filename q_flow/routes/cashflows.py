@@ -21,50 +21,17 @@ from q_flow.routes.activities import (
     _validate_activity,
 )
 from q_flow.services.decorators import auth_required
+from q_flow.services.portable_cashflow import (
+    ACTIVITY_SOURCE_FIELDS,
+    CASHFLOW_SOURCE_FIELDS,
+    PORTABLE_FORMAT,
+    PORTABLE_VERSION,
+    build_portable_cashflow,
+)
 from q_flow.services.units import EDIT_CASHFLOW, VIEW_CASHFLOW, ensure_unit_permission
 from q_flow.services.utils import read_data
 
 cashflows = Blueprint("cashflows", __name__)
-
-_IMPORT_FORMAT = "cashflowpot.cashflow"
-_IMPORT_VERSION = 1
-_CASHFLOW_IMPORT_FIELDS = {
-    "name",
-    "description",
-    "advance",
-    "retention",
-    "release_retention_eop",
-    "dlp",
-    "duration_for_payment",
-    "interest_rate",
-    "contract_value",
-    "wieb",
-    "use_independent_inflow_curve",
-    "inflow_curve_type",
-    "inflow_curve_skew",
-    "financing_facilities",
-}
-_ACTIVITY_IMPORT_FIELDS = {
-    "name",
-    "activity_type",
-    "activity_mode",
-    "distribution_type",
-    "cost_schedule_json",
-    "cost",
-    "duration",
-    "duration_units",
-    "start",
-    "advance",
-    "retention",
-    "release_retention_eop",
-    "dlp",
-    "duration_for_payment",
-    "work_in_excess",
-    "mobilization_period",
-    "subcontracted",
-    "skew",
-    "no_billing_period",
-}
 
 
 @cashflows.route("/financing-facility-presets")
@@ -194,11 +161,11 @@ def _read_import_payload(data):
     InvalidData.require_condition(
         isinstance(data, dict), "Invalid cashflow import payload")
     InvalidData.require_condition(
-        data.get("format") == _IMPORT_FORMAT,
+        data.get("format") == PORTABLE_FORMAT,
         "Unsupported cashflow file format",
     )
     InvalidData.require_condition(
-        data.get("version") == _IMPORT_VERSION,
+        data.get("version") == PORTABLE_VERSION,
         "Unsupported cashflow file version",
     )
     cashflow_data = data.get("cashflow")
@@ -254,7 +221,7 @@ def import_cashflow(user, unit_id):
 
     user_id = user.get("user_id")
     cashflow = Cashflow().from_dict(
-        _filtered(cashflow_data, _CASHFLOW_IMPORT_FIELDS),
+        _filtered(cashflow_data, CASHFLOW_SOURCE_FIELDS),
         user_id,
     )
     cashflow.unit_id = unit_id
@@ -287,7 +254,7 @@ def import_cashflow(user, unit_id):
                     "Missing activity cost or duration",
                 )
 
-            activity_data = _filtered(row, _ACTIVITY_IMPORT_FIELDS)
+            activity_data = _filtered(row, ACTIVITY_SOURCE_FIELDS)
             activity = Activity().from_dict(activity_data, user_id)
             activity.cashflow_id = cashflow.id
             activity.is_deleted = False
@@ -326,6 +293,16 @@ def get_cashflow(user, cashflow_id):
     if error:
         return error
     return jsonify(data=cashflow.as_dict_with_activities()), 200
+
+
+@cashflows.route("/cashflow/<cashflow_id>/export")
+@auth_required
+def export_cashflow(user, cashflow_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, VIEW_CASHFLOW)
+    if error:
+        return error
+    return jsonify(build_portable_cashflow(cashflow)), 200
 
 
 @cashflows.route("/cashflow/<cashflow_id>", methods=["PUT"])
