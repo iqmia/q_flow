@@ -123,14 +123,17 @@ def _create_cashflow(app):
     return response.get_json()["data"]
 
 
-def test_export_returns_only_versioned_portable_source_inputs(app):
-    snapshot = _create_cashflow(app)
-
+def _export(app, cashflow_id):
     with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
-        response = app.test_client().get(
-            f"/cashflow/{snapshot['id']}/export",
+        return app.test_client().get(
+            f"/cashflow/{cashflow_id}/export",
             headers=_auth(),
         )
+
+
+def test_export_returns_only_versioned_portable_source_inputs(app):
+    snapshot = _create_cashflow(app)
+    response = _export(app, snapshot["id"])
 
     assert response.status_code == 200
     exported = response.get_json()
@@ -187,6 +190,35 @@ def test_export_returns_only_versioned_portable_source_inputs(app):
             "is_deleted",
             "cash_flow_json",
         }.isdisjoint(activity)
+
+
+def test_export_can_be_imported_into_another_project_without_calculated_state(app):
+    source = _create_cashflow(app)
+    export_response = _export(app, source["id"])
+    assert export_response.status_code == 200
+
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        imported_response = app.test_client().post(
+            "/project/unit-2/cashflows/import",
+            headers=_auth(),
+            json=export_response.get_json(),
+        )
+
+    assert imported_response.status_code == 201
+    imported = imported_response.get_json()["data"]
+    assert imported["unit_id"] == "unit-2"
+    assert imported["name"] == source["name"]
+    assert imported["use_independent_inflow_curve"] is True
+    assert imported["inflow_curve_skew"] == pytest.approx(0.2)
+    assert imported["financing_facilities"][0]["id"] == "od-1"
+    assert [row["activity_mode"] for row in imported["activities"]] == [
+        "work",
+        "scheduled_cost",
+    ]
+    assert imported["activities"][0]["cost_schedule_json"] == [100.0, 150.0, 50.0]
+    assert imported["activities"][1]["cost_schedule_json"] == [0.0, 250.0, 100.0]
+    assert imported["workflow"]
+    assert imported["outflow"]
 
 
 def test_export_requires_normal_cashflow_view_permission(app):
