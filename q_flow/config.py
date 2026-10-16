@@ -33,6 +33,15 @@ class Config(object):
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DATABASE_URL = data.get('DATABASE_URL', '')
 
+    # Public export links. XLSX bytes are generated on demand and never stored;
+    # only the signed URL token has a short lifetime.
+    PUBLIC_API_BASE_URL = data.get(
+        'PUBLIC_API_BASE_URL', 'https://cashflowpot.com/api'
+    )
+    EXCEL_EXPORT_TOKEN_TTL_SECONDS = int(
+        data.get('EXCEL_EXPORT_TOKEN_TTL_SECONDS', 600)
+    )
+
     # Email settings
     MAIL_SERVER = 'premium106.web-hosting.com'
     MAIL_PORT = 465
@@ -71,6 +80,15 @@ class LocalConfig(Config):
     STORAGE_PATH = data.get('STORAGE_PATH') or path.join(Config.BASE_DIR, 'main_storage')
     DATABASE_URL = data.get('DATABASE_URL', '')
     USER_API_URL = 'http://localhost:5000/user/'
+    PUBLIC_API_BASE_URL = data.get(
+        'PUBLIC_API_BASE_URL', Config.PUBLIC_API_BASE_URL
+    )
+    EXCEL_EXPORT_TOKEN_TTL_SECONDS = int(
+        data.get(
+            'EXCEL_EXPORT_TOKEN_TTL_SECONDS',
+            Config.EXCEL_EXPORT_TOKEN_TTL_SECONDS,
+        )
+    )
 
     SECRET_KEY = data.get('SECRET_KEY', Config.SECRET_KEY)
     MAIL_PASSWORD = data.get('MAIL_PASSWORD', Config.MAIL_PASSWORD)
