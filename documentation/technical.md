@@ -515,7 +515,7 @@ The builder maintains an authoritative `PublicPage` registry containing each pag
 
 The shared public head provides canonical/robots metadata, Open Graph and Twitter metadata, JSON-LD, breadcrumbs, and the shared social image.
 
-`build_site.py` also generates root `robots.txt`, `sitemap.xml`, and `llms.txt`. The public website is the authoritative indexable discovery surface. The Flutter `/app/` shell remains crawlable but non-indexable, while `/api/` is disallowed through the public robots policy.
+`build_site.py` also generates root `robots.txt`, `sitemap.xml`, and `llms.txt`. The public website is the authoritative indexable discovery surface. The Flutter `/app/` shell remains crawlable but non-indexable, while `/api/` is disallowed through the public robots policy. The application shell and API are not a discovery surface for indexable public product content.
 
 ## 21. Tests
 
