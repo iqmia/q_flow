@@ -19,3 +19,5 @@ XlsxWriter==3.2.9
 prettytable==3.10.0
 matplotlib==3.9.0
 asciichartpy==1.5.25
+
+XlsxWriter==3.2.9
