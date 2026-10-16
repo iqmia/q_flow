@@ -231,9 +231,12 @@ The backend export feature also uses:
 ```text
 PUBLIC_API_BASE_URL=https://cashflowpot.com/api
 EXCEL_EXPORT_TOKEN_TTL_SECONDS=600
+EXCEL_LOGO_PATH=/home/cashflowpot/public_html/app/assets/assets/icon/qflow_logo.png
 ```
 
 `PUBLIC_API_BASE_URL` must be the externally visible API base, not Gunicorn's loopback URL, because Apache strips `/api/` before requests reach Flask. `EXCEL_EXPORT_TOKEN_TTL_SECONDS` defaults to 600 seconds when omitted.
+
+`EXCEL_LOGO_PATH` is optional. Its default is the deployed Flutter asset path shown above, so the backend report uses the same CashflowPot logo as the application. If the file is absent, Excel generation continues without a logo rather than failing the export.
 
 The signed Excel token uses the Flask `SECRET_KEY`; changing that key invalidates outstanding download URLs. The URL is a short-lived bearer capability, so it should not be logged or shared beyond the intended recipient.
 
@@ -255,6 +258,7 @@ GET <download_url>
         -> verify signed token
         -> confirm active cashflow + exact project/unit match
         -> load current authoritative scenario
+        -> load the deployed CashflowPot report logo when available
         -> generate XLSX in memory
         -> stream attachment
         -> release memory
@@ -315,7 +319,7 @@ Also confirm the systemd service is running:
 systemctl status cashflowpot
 ```
 
-For Excel, create a signed URL through the authenticated POST route and open it before expiry. Confirm the response MIME type is XLSX and that no `.xlsx` file appears under `main_storage`.
+For Excel, create a signed URL through the authenticated POST route and open it before expiry. Confirm the response MIME type is XLSX, the workbook contains the CashflowPot logo when the Flutter asset is deployed, and no `.xlsx` file appears under `main_storage`.
 
 ## 14. Deployment rules
 
@@ -331,6 +335,7 @@ For Excel, create a signed URL through the authenticated POST route and open it 
 10. Server secrets and persistent data are not source-controlled deployment artifacts.
 11. Excel download URLs are short-lived signed capabilities; generated workbooks are in-memory only and must not be added to persistent storage.
 12. `PUBLIC_API_BASE_URL` must stay aligned with the externally visible Apache `/api` URL.
+13. The Excel exporter reads the existing deployed Flutter logo asset; it does not copy that image into q_flow storage.
 
 The Activity-mode, Scheduled Cost, financing-facility, and backend Excel-report updates do not change the core CashflowPot deployment topology.
 
