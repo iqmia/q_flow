@@ -63,7 +63,8 @@ class CurrentProductSiteTest(TestCase):
             '.hero--home .split-section',
             'minmax(0, 0.72fr) minmax(0, 1fr)',
             '.hero--home h1',
-            'clamp(2.6rem, 4vw, 3.6rem)',
+            'font-size: 3rem',
+            'clamp(2.6rem, 4.2vw, 3rem)',
             '.hero--home .hero__image',
             'aspect-ratio: 4 / 3',
         ):
