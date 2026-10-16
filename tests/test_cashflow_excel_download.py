@@ -185,6 +185,33 @@ def test_download_route_streams_current_workbook_without_authorization_or_storag
     assert set(Path(tmp_path).rglob("*.xlsx")) == before
 
 
+def test_download_passes_deployed_cashflowpot_logo_to_excel_builder(app, tmp_path):
+    _create_cashflow(app)
+    logo = tmp_path / "qflow_logo.png"
+    logo.write_bytes(b"cashflowpot-logo-bytes")
+    app.config["EXCEL_LOGO_PATH"] = str(logo)
+    token, _ = create_excel_export_token(
+        secret=SECRET,
+        cashflow_id="cf-export",
+        unit_id="unit-1",
+        project_name="Harbour Tower",
+        ttl_seconds=600,
+        now=NOW,
+    )
+
+    with (
+        patch("q_flow.routes.exports._utc_now", return_value=NOW),
+        patch(
+            "q_flow.routes.exports.build_cashflow_excel",
+            return_value=b"PK\x03\x04fake-xlsx",
+        ) as builder,
+    ):
+        response = app.test_client().get(f"/exports/cashflow/{token}.xlsx")
+
+    assert response.status_code == 200
+    assert builder.call_args.kwargs["logo_bytes"] == b"cashflowpot-logo-bytes"
+
+
 def test_download_rejects_expired_token_and_unit_mismatch(app):
     _create_cashflow(app)
     token, _ = create_excel_export_token(
