@@ -20,6 +20,14 @@ from q_flow.routes.activities import (
     _set_scalar_defaults as _set_activity_scalar_defaults,
     _validate_activity,
 )
+from q_flow.services.cashflow_facilities import (
+    add_facility,
+    delete_facility,
+    get_facility,
+    normalize_facility_ids,
+    set_facility_order,
+    update_facility,
+)
 from q_flow.services.decorators import auth_required
 from q_flow.services.portable_cashflow import (
     ACTIVITY_SOURCE_FIELDS,
@@ -181,6 +189,36 @@ def _read_import_payload(data):
     return cashflow_data, activities
 
 
+def _normalized_facilities(cashflow: Cashflow, *, persist: bool = False):
+    facilities, changed = normalize_facility_ids(
+        cashflow.financing_facilities or []
+    )
+    if changed:
+        cashflow.financing_facilities = facilities
+        if persist:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
+    return facilities
+
+
+def _finalize_facility_mutation(cashflow: Cashflow, facilities, user_id: str):
+    cashflow.financing_facilities = facilities
+    cashflow.updated_by = user_id
+    cashflow.updated_at = func.now()
+    try:
+        _validate_cashflow(cashflow)
+        db.session.flush()
+        snapshot = cashflow.as_dict_with_activities()
+        db.session.commit()
+        return snapshot
+    except Exception:
+        db.session.rollback()
+        raise
+
+
 @cashflows.route("/project/<unit_id>/cashflows", methods=["POST"])
 @auth_required
 def new_cashflow(user, unit_id):
@@ -305,6 +343,118 @@ def export_cashflow(user, cashflow_id):
     return jsonify(build_portable_cashflow(cashflow)), 200
 
 
+@cashflows.route("/cashflow/<cashflow_id>/facilities", methods=["GET"])
+@auth_required
+def list_financing_facilities(user, cashflow_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, VIEW_CASHFLOW)
+    if error:
+        return error
+    return jsonify(data=_normalized_facilities(cashflow, persist=True)), 200
+
+
+@cashflows.route(
+    "/cashflow/<cashflow_id>/facilities/<facility_id>", methods=["GET"]
+)
+@auth_required
+def get_financing_facility(user, cashflow_id, facility_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, VIEW_CASHFLOW)
+    if error:
+        return error
+    facilities = _normalized_facilities(cashflow, persist=True)
+    return jsonify(data=get_facility(facilities, facility_id)), 200
+
+
+@cashflows.route("/cashflow/<cashflow_id>/facilities", methods=["POST"])
+@auth_required
+def create_financing_facility(user, cashflow_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, EDIT_CASHFLOW)
+    if error:
+        return error
+    facilities = _normalized_facilities(cashflow)
+    next_facilities, facility = add_facility(
+        facilities, read_data(request) or {}
+    )
+    snapshot = _finalize_facility_mutation(
+        cashflow, next_facilities, user.get("user_id")
+    )
+    return jsonify(
+        facility=facility,
+        cashflow=snapshot,
+        message="Financing facility created successfully",
+    ), 201
+
+
+@cashflows.route("/cashflow/<cashflow_id>/facilities/order", methods=["PUT"])
+@auth_required
+def reorder_financing_facilities(user, cashflow_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, EDIT_CASHFLOW)
+    if error:
+        return error
+    data = read_data(request) or {}
+    next_facilities = set_facility_order(
+        _normalized_facilities(cashflow), data.get("facility_ids")
+    )
+    snapshot = _finalize_facility_mutation(
+        cashflow, next_facilities, user.get("user_id")
+    )
+    return jsonify(
+        cashflow=snapshot,
+        message="Financing facility order updated successfully",
+    ), 200
+
+
+@cashflows.route(
+    "/cashflow/<cashflow_id>/facilities/<facility_id>", methods=["PUT"]
+)
+@auth_required
+def update_financing_facility(user, cashflow_id, facility_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, EDIT_CASHFLOW)
+    if error:
+        return error
+    next_facilities, facility = update_facility(
+        _normalized_facilities(cashflow),
+        facility_id,
+        read_data(request) or {},
+    )
+    snapshot = _finalize_facility_mutation(
+        cashflow, next_facilities, user.get("user_id")
+    )
+    # Return the validated, persisted representation (the object may have been
+    # normalized by future validators), while keeping the addressed ID stable.
+    facility = get_facility(snapshot["financing_facilities"], facility_id)
+    return jsonify(
+        facility=facility,
+        cashflow=snapshot,
+        message="Financing facility updated successfully",
+    ), 200
+
+
+@cashflows.route(
+    "/cashflow/<cashflow_id>/facilities/<facility_id>", methods=["DELETE"]
+)
+@auth_required
+def remove_financing_facility(user, cashflow_id, facility_id):
+    cashflow = _active_cashflow(cashflow_id)
+    error = _permission(user, cashflow, EDIT_CASHFLOW)
+    if error:
+        return error
+    next_facilities = delete_facility(
+        _normalized_facilities(cashflow), facility_id
+    )
+    snapshot = _finalize_facility_mutation(
+        cashflow, next_facilities, user.get("user_id")
+    )
+    return jsonify(
+        cashflow=snapshot,
+        message="Financing facility deleted successfully",
+    ), 200
+
+
 @cashflows.route("/cashflow/<cashflow_id>", methods=["PUT"])
 @auth_required
 def update_cashflow(user, cashflow_id):
@@ -362,7 +512,8 @@ def hard_delete_cashflow(user, cashflow_id):
     if error:
         return error
     Activity.query.filter_by(cashflow_id=cashflow.id).delete(
-        synchronize_session=False)
+        synchronize_session=False
+    )
     db.session.delete(cashflow)
     db.session.commit()
     return jsonify(message="Cashflow hard deleted successfully"), 200
