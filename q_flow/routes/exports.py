@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from io import BytesIO
+from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, send_file
 
@@ -33,6 +34,19 @@ def _active_cashflow(cashflow_id: str) -> Cashflow | None:
     if cashflow is None or cashflow.is_deleted:
         return None
     return cashflow
+
+
+def _excel_logo_bytes() -> bytes | None:
+    """Load the deployed Flutter report logo without making it backend state."""
+    logo_path = current_app.config.get("EXCEL_LOGO_PATH")
+    if not logo_path:
+        return None
+    try:
+        return Path(str(logo_path)).read_bytes()
+    except OSError:
+        # Match the Flutter exporter: a missing optional logo must never block
+        # an otherwise valid report. The workbook simply renders without it.
+        return None
 
 
 @exports.route("/cashflow/<cashflow_id>/excel-export", methods=["POST"])
@@ -94,6 +108,7 @@ def download_cashflow_excel(signed_token):
     workbook = build_cashflow_excel(
         project_name=claims.project_name,
         snapshot=snapshot,
+        logo_bytes=_excel_logo_bytes(),
     )
     return send_file(
         BytesIO(workbook),
