@@ -2,10 +2,11 @@
 
 ## 1. Repository roles
 
-CashflowPot is split across two main application repositories:
+CashflowPot currently spans three relevant repositories:
 
-- `iqmia/q_flow` — Flask backend, authoritative calculation engine, QAuth integration, portable JSON import endpoint, financing-facility engine, tests, and the source/build system for the public CashflowPot website.
-- `iqmia/cashflowpot` — Flutter client deployed under `/app/`; owns user input/presentation, charts, portable JSON export/import UX, and Excel report generation from backend-calculated scenario data.
+- `iqmia/q_flow` — Flask backend, authoritative calculation engine, QAuth Unit integration, portable JSON import/export, financing-facility engine and atomic facility APIs, backend Excel report generation, tests, and the source/build system for the public CashflowPot website.
+- `iqmia/cashflowpot` — Flutter client deployed under `/app/`; owns user input/presentation, charts, portable JSON UX, and the existing client-side Excel/report UX.
+- `iqmia/quollnet-mcp` — MCP gateway. Its dedicated `/cashflowpot` resource translates AI-facing tools into normal QAuth token exchange plus q_flow API calls. It does not duplicate CashflowPot persistence or financial calculations.
 
 The public website source lives in `q_flow/site/` and is rendered to static HTML. It is not a Flask-rendered website at request time.
 
@@ -13,7 +14,7 @@ The backend/package name remains `q_flow` even though the product name is Cashfl
 
 ## 2. Production surfaces
 
-The same domain exposes three independent surfaces:
+The CashflowPot domain exposes:
 
 ```text
 cashflowpot.com/      static public website
@@ -21,9 +22,16 @@ cashflowpot.com/app/  Flutter application
 cashflowpot.com/api/  Flask API through Apache + Gunicorn
 ```
 
-Apache exposes `/api/` and reverse-proxies to Gunicorn on `127.0.0.1:5002`. The Flask application itself defines routes without an `/api` prefix.
+The MCP gateway is deployed separately at:
 
-The Gunicorn process is managed by systemd as `cashflowpot-qflow.service`, with `/home/cashflowpot/q_flow` as the working directory and `wsgi:app` as the application entrypoint.
+```text
+mcp.quollnet.com/mcp          existing Quollnet MCP
+mcp.quollnet.com/cashflowpot  dedicated CashflowPot MCP
+```
+
+Apache exposes CashflowPot `/api/` and reverse-proxies to Gunicorn on `127.0.0.1:5002`. The Flask application itself defines routes without an `/api` prefix.
+
+The q_flow Gunicorn process is managed by the CashflowPot systemd service with `/home/cashflowpot/q_flow` as the working directory and `wsgi:app` as the application entrypoint.
 
 See [`deployment.md`](deployment.md) for the exact server layout and commands.
 
@@ -32,8 +40,9 @@ See [`deployment.md`](deployment.md) for the exact server layout and commands.
 `q_flow.create_app()` initializes the core extensions and registers the current blueprints:
 
 - `projects` — project / QAuth Unit operations;
-- `cashflows` — cash-flow scenario operations and portable scenario import;
+- `cashflows` — cash-flow scenario operations, portable scenario import/export, and atomic financing-facility operations;
 - `activities` — Activity CRUD and Activity cash-flow updates;
+- `exports` — signed Excel export-link creation and stateless workbook streaming;
 - `users` — QAuth-facing user flows;
 - `system` — system/health routes.
 
@@ -44,6 +53,8 @@ The application uses SQLAlchemy. Production uses PostgreSQL from the configured 
 ```
 
 When `DATABASE_URL` is absent, the application can fall back to SQLite at `<STORAGE_PATH>/q_flow.db`, which remains useful for local/test-compatible operation. Tests use their own test configuration and storage.
+
+Generated Excel reports are not persisted in `main_storage` or elsewhere. They are built in memory and streamed directly.
 
 ## 4. Project identity and QAuth
 
@@ -67,9 +78,9 @@ view:cashflow
 edit:cashflow
 ```
 
-Creating a new project creates a QAuth Unit and then creates a local `Base Cashflow` scenario for that Unit.
+Creating a new project creates a QAuth Unit and then creates a local `Base Cashflow` scenario for that Unit. A QAuth Unit can own multiple local cash-flow scenarios.
 
-A QAuth Unit can own multiple local cash-flow scenarios.
+For MCP access, the connected OAuth token belongs to the QAuth MCP resource. The MCP server exchanges it through QAuth for the same normal CashflowPot app or Unit token that q_flow already understands. q_flow therefore keeps the same authorization boundary for Flutter and MCP callers.
 
 ## 5. Main local models
 
@@ -87,6 +98,8 @@ Important groups of fields include:
 - inflow method: `use_independent_inflow_curve`, `inflow_curve_type`, `inflow_curve_skew`;
 - financing facilities: `financing_facilities` JSON definitions;
 - relationship: `activities`.
+
+Financing facilities deliberately remain embedded in the Cashflow aggregate. That is what allows one portable JSON scenario to contain its commercial assumptions, Activities, inflow model, and financing setup in a single shareable document.
 
 New scenarios use Independent inflow defaults; legacy rows can retain null values in the independent-inflow columns and therefore remain activity-linked.
 
@@ -143,7 +156,7 @@ Important classes/functions are:
 
 `Project_cf` remains as a compatibility alias for `CashflowCalculator`.
 
-The backend is authoritative for calculation logic. The canonical formula reference is [`reference/cashflow_model.md`](reference/cashflow_model.md).
+The backend is authoritative for calculation logic. Neither Flutter reporting nor MCP tools are second financial engines. The canonical formula reference is [`reference/cashflow_model.md`](reference/cashflow_model.md).
 
 ## 7. Work vs Scheduled Cost calculation
 
@@ -182,9 +195,7 @@ CashflowPot deliberately separates **Work duration** from **financial horizon**.
 
 ### Work duration
 
-`CashflowCalculator.duration` is the maximum Work Activity calculated work-series length.
-
-Scheduled Cost does not extend this value.
+`CashflowCalculator.duration` is the maximum Work Activity calculated work-series length. Scheduled Cost does not extend this value.
 
 ### Financial horizon
 
@@ -221,7 +232,7 @@ Two supporting PPC series are used by financing:
 
 PPC Discount draw logic uses `ppc_issued`; PPC-linked repayment uses `ppc_base`.
 
-## 10. Financing engine
+## 10. Financing engine and atomic facility API
 
 Facility definitions are plain dictionaries validated by `validate_financing_facilities()` and calculated by `calculate_financing()`.
 
@@ -254,6 +265,8 @@ Scheduled draw schedules represent requested financing inflows. Actual draw is c
 
 Facility interest uses opening principal. One-time fees are charged at the configured availability start period. Automatic repayment of a scheduled draw through `% PPC` or cashflow sweep is capped to opening-period principal so a new scheduled draw cannot be automatically repaid in the same period.
 
+Facilities are stored inside `cashflow.financing_facilities`, but q_flow exposes atomic list/get/add/update/delete/order operations. These routes normalize stable facility IDs and validate/recalculate the complete scenario transactionally. An MCP or other client therefore does not need to fetch and rewrite the full array for a one-facility edit.
+
 Detailed facility behavior is documented in [`reference/financing_facilities.md`](reference/financing_facilities.md).
 
 ## 11. Snapshot keys
@@ -269,18 +282,7 @@ outflow_with_interest
 duration
 ```
 
-When financing facilities are configured, the snapshot also includes:
-
-```text
-facility_rows
-facility_inflow
-facility_outflow
-facility_interest
-facility_fees
-funded_netflow
-pre_financing_balance
-unfunded_shortfall
-```
+When financing facilities are configured, the snapshot also includes facility draw/repayment/interest/fee rows, pre-financing balance, funded cash position, and unfunded shortfall arrays.
 
 Important semantic notes:
 
@@ -288,9 +290,8 @@ Important semantic notes:
 - `inflow` is client/project cash receipts;
 - `outflow` is project cost/payments from all Activities;
 - `netflow` is project inflow minus project outflow before explicit facilities;
-- `facility_inflow` is total actual facility draws;
-- `facility_outflow` is principal repayment only;
-- `funded_netflow` is total inflow minus total outflow including facilities;
+- facility draws are actual financing inflows;
+- facility repayment is principal only;
 - `outflow_with_interest` is the funded closing cash balance despite the legacy name;
 - `duration` is Work duration, not financial horizon.
 
@@ -314,7 +315,7 @@ outstanding[]
 available_limit[]
 ```
 
-The Flutter presentation combines `interest[] + fees[]` into one **Interest & fees** row while keeping the source arrays separate for calculation/KPI detail.
+The report presentation combines `interest[] + fees[]` into one **Interest & fees** row while keeping the source arrays separate for calculation/KPI detail.
 
 ## 13. Summary / KPI fields
 
@@ -382,7 +383,7 @@ Excel keeps actual numeric cells/formulas; display formatting is separate from t
 
 ## 15. Validation and transactions
 
-Cashflow and Activity mutation routes validate model inputs before committing.
+Cashflow, Activity, and facility mutation routes validate model inputs before committing.
 
 The backend enforces rules including:
 
@@ -403,26 +404,30 @@ The Flutter client mirrors key validation rules to give immediate feedback, but 
 
 ## 16. Portable scenario JSON
 
-CashflowPot can export/import a versioned portable input model using:
+CashflowPot exports/imports a versioned portable input model using:
 
 ```text
 format = cashflowpot.cashflow
 version = 1
 ```
 
-The file contains scenario inputs, facilities, and Activity source inputs, not server identity or calculated arrays.
+The file contains scenario source inputs, embedded facilities, and Activity source inputs. It deliberately excludes server identity, ownership, calculated arrays, and Activity calculation caches.
 
-Version 1 remains backward compatible with old Activity files that do not include `activity_mode`, `distribution_type`, or `cost_schedule_json`.
+The backend is now the canonical serializer as well as the canonical importer. MCP export returns the q_flow-generated document rather than reconstructing it from a calculated snapshot.
 
-The Flutter client validates the file before import confirmation. The backend validates the scenario and every Activity again, normalizes mode/distribution semantics, derives schedule-based cost/duration, calculates the resulting snapshot, and commits the imported scenario transactionally.
+Version 1 remains backward compatible with old Activity files that do not include `activity_mode`, `distribution_type`, or `cost_schedule_json`. Legacy facilities that lack an ID are normalized with stable IDs when they are addressed through the facility API; no bulk data migration is required.
+
+The Flutter client can validate a file before import confirmation. The backend validates the scenario and every Activity again, normalizes mode/distribution semantics, derives schedule-based cost/duration, calculates the resulting snapshot, and commits the imported scenario transactionally.
 
 The exact format is defined in [`reference/cashflow_json_format.md`](reference/cashflow_json_format.md).
 
 ## 17. Excel/report architecture
 
-The current Excel workbook is generated by the Flutter client from the calculated scenario model. It is a reporting layer, not a second financial engine.
+The approved CashflowPot workbook design originated in the Flutter exporter and remains the report-layout reference, including sheet structure, styles, chart/KPI structure, column geometry, formulas, and A4/A3 print/PDF setup.
 
-The lower report structure is:
+q_flow now also generates that report in Python with `XlsxWriter`, using authoritative backend scenario values. Targeted OOXML post-processing can be used only where XlsxWriter cannot reproduce an approved workbook detail directly.
+
+The report is still a presentation layer, not a second financial engine. The lower structure is:
 
 ```text
 PROJECT CASHFLOW
@@ -433,23 +438,68 @@ RECONCILIATION & NOTES
 
 The exporter uses backend-calculated facility series for Draw, Repayment, Interest & fees, and Outstanding balance. Workbook formulas are used for reporting reconciliation/aggregation where appropriate, but the exporter does not reimplement facility banking rules.
 
-The workbook retains numeric cells, one-decimal cashflow display formatting, approved A4-landscape/A3 print geometry, existing column widths, and current chart/KPI structure.
+The workbook retains numeric cells, one-decimal cashflow display formatting, approved A4-landscape/A3 print geometry, existing column widths, and the current chart/KPI structure.
 
-## 18. Authentication and authorization
+### Stateless Excel delivery
+
+The authenticated creation route is:
+
+```text
+POST /cashflow/<cashflow_id>/excel-export
+```
+
+It requires normal CashflowPot authentication and `VIEW_CASHFLOW`, then returns:
+
+```text
+filename
+download_url
+expires_at
+```
+
+The public download route is:
+
+```text
+GET /exports/cashflow/<signed-token>.xlsx
+```
+
+The signed token binds the download to the cashflow, exact project/unit, project name, export purpose, and expiry. The route verifies the token, loads the **current** authoritative scenario, generates the workbook in memory, and streams it. No Excel file is retained on disk and no cleanup job is needed.
+
+`PUBLIC_API_BASE_URL` supplies the externally visible `/api` base because Apache strips that prefix before Flask sees requests. `EXCEL_EXPORT_TOKEN_TTL_SECONDS` defaults to 600 seconds.
+
+## 18. MCP integration
+
+The dedicated CashflowPot MCP is an adapter, not part of the financial engine:
+
+```text
+AI client
+  -> OAuth/PKCE with QAuth
+  -> MCP access token aud=https://mcp.quollnet.com/cashflowpot
+  -> quollnet-mcp /cashflowpot
+  -> QAuth exchange to normal CashflowPot app/Unit token
+  -> cashflowpot.com/api (q_flow)
+```
+
+The dedicated MCP exposes projects, cashflows/results, activities, facility convenience operations, portable JSON import/export, and Excel export. q_flow remains authoritative for every operation underneath.
+
+Excel is returned to MCP as signed URL metadata only. The MCP server does not fetch, proxy, base64-encode, or store the workbook.
+
+## 19. Authentication and authorization
 
 Protected q_flow routes expect:
 
 ```http
-Authorization: Bearer <QAuth user token>
+Authorization: Bearer <QAuth user or Unit token>
 ```
 
 q_flow verifies the user JWT locally using the configured QAuth public key/algorithm and application audience. Calls from q_flow to QAuth carry a short-lived application JWT in the `client-app-id` header.
 
 Project access is then enforced using QAuth Unit context and Unit permissions.
 
+The stateless Excel GET route is the intentional exception: possession of the unexpired signed URL authorizes that specific export download. Its claims are validated before any cashflow is loaded or report generated.
+
 Token refresh and the exact current security flow are documented in [`reference/security.md`](reference/security.md).
 
-## 19. Public website and discovery metadata
+## 20. Public website and discovery metadata
 
 The public website source is under:
 
@@ -463,19 +513,13 @@ site/build_site.py
 
 The builder maintains an authoritative `PublicPage` registry containing each page's output destination, canonical path, indexing status, title/description metadata, and schema type. That registry drives sitemap membership and supplies the shared Jinja shell with canonical/search/social metadata.
 
-The shared public head provides:
+The shared public head provides canonical/robots metadata, Open Graph and Twitter metadata, JSON-LD, breadcrumbs, and the shared social image.
 
-- canonical URLs and robots directives;
-- Open Graph and Twitter metadata;
-- the shared social image `https://cashflowpot.com/assets/images/cashflowpot-og.webp`;
-- homepage JSON-LD for the Quollnet Organization, CashflowPot WebSite, and current SoftwareApplication;
-- lightweight page-level JSON-LD plus breadcrumb data on internal public pages.
+`build_site.py` also generates root `robots.txt`, `sitemap.xml`, and `llms.txt`. The public website is the authoritative indexable discovery surface. The Flutter `/app/` shell remains crawlable but non-indexable, while `/api/` is disallowed through the public robots policy.
 
-`build_site.py` also generates root `robots.txt`, `sitemap.xml`, and `llms.txt`. The public website is the authoritative indexable discovery surface. The Flutter `/app/` shell remains crawlable but non-indexable so its `noindex, follow` directive can be read, while `/api/` is not a discovery surface and is disallowed through the public robots policy.
+## 21. Tests
 
-## 20. Tests
-
-Backend tests live under `tests/` and cover calculations, Activity modes, Scheduled Cost, financing facilities, validation, QAuth integration boundaries, project/cash-flow routes, portable import, public-site builder, and documentation structure.
+Backend tests live under `tests/` and cover calculations, Activity modes, Scheduled Cost, financing facilities, validation, QAuth integration boundaries, project/cash-flow routes, portable import/export, backend Excel generation, signed download tokens/no-storage behavior, public-site builder, and documentation structure.
 
 For a backend change, the final local verification command is normally:
 
@@ -485,7 +529,9 @@ pytest
 
 Flutter tests are maintained in `iqmia/cashflowpot` and cover input/presentation/export contracts. Run them when a change affects client behavior or shared input/output contracts.
 
-## 21. Compatibility debt to recognize
+The dedicated MCP tests live in `iqmia/quollnet-mcp` and verify audience isolation, `/mcp` compatibility, full `/cashflowpot` tool registration, token exchange, route mapping, source-field forwarding, atomic facility operations, and signed Excel metadata forwarding.
+
+## 22. Compatibility debt to recognize
 
 Some current names exist for historical compatibility and should not be treated as ideal semantic names:
 
@@ -499,4 +545,4 @@ Some current names exist for historical compatibility and should not be treated 
 
 Do not rename these casually without a migration/compatibility plan. User-facing language should remain clear even while legacy backend names exist.
 
-Last reviewed: 14 October 2026.
+Last reviewed: 17 October 2026.
