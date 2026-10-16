@@ -15,6 +15,18 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
+      - name: Seed deterministic test config
+        run: |
+          cat > env.json <<'JSON'
+          {
+            "SECRET_KEY": "ci-secret-key",
+            "APP_ID": "cashflowpot-ci",
+            "PUBLIC_KEY": "ci-public-key",
+            "ALGO": "RS256",
+            "APP_SECRET": "ci-app-secret",
+            "APP_ALGO": "HS256"
+          }
+          JSON
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
