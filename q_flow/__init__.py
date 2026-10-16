@@ -57,6 +57,7 @@ def create_app(config_class=Config):
     from q_flow.routes.activities import activities
     from q_flow.routes.users import users
     from q_flow.routes.system import system
+    from q_flow.routes.exports import exports
     from logging import getLogger
     log = getLogger(__name__)
     log.debug('Routes registered')
@@ -65,6 +66,7 @@ def create_app(config_class=Config):
     app.register_blueprint(activities)
     app.register_blueprint(users)
     app.register_blueprint(system)
+    app.register_blueprint(exports)
 
     with app.app_context():
         db.create_all()
