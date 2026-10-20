@@ -4,6 +4,24 @@ This document defines the portable JSON format used to export and import a Cashf
 
 The portable file is an **input model**, not a serialized API response. It is intended for backup/transfer and is also the natural structured target for future AI-assisted scenario generation.
 
+For calculated API results, `GET /cashflow/<id>` retains its full scenario
+response by default. `?detail=summary` selects a compact read-only view containing
+`id`, `unit_id`, `name`, the same calculated `summary`, and `properties` grouped as
+`contract`, `forecast`, `activity_counts`, `financing` and `units`. It excludes
+period arrays, activity definitions, financing schedules and ORM metadata, while
+using the same calculator and project permission check. `?detail=full` explicitly
+selects the existing full response. Other detail values return a validation error.
+The portable source document and export/import format are unchanged.
+
+The compact units include `periods_per_year: null`: the model stores integer
+periods and does not establish a calendar frequency. Annual interest quotations
+must be converted using a user-confirmed period convention and nominal/effective
+rate basis. The KPI `peak_pre_financing_need` is the gap before financing costs;
+`peak_unfunded_shortfall` is the remaining deficit after the modeled facilities
+and charges, or after legacy scenario interest when no facilities are configured.
+`financing_cost` sums explicit facility interest and fees; legacy scenario interest
+is reflected in the cash-balance series rather than this facility-only KPI.
+
 ## 1. Version marker
 
 ```json

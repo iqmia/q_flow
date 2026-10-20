@@ -271,6 +271,8 @@ def test_serialized_cashflow_exposes_canonical_scenario_summary(app):
             "work_duration": 1,
             "dlp": 0,
             "financial_horizon": 2,
+            "contractor_contribution": 0.0,
+            "peak_unfunded_shortfall": 60.5,
         }
 
 

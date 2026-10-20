@@ -50,7 +50,7 @@ class Cashflow(db.Model, BaseMixin):
             "description": self.description or "",
         }
 
-    def as_dict_with_activities(self):
+    def as_dict_with_activities(self, *, include_details=True):
         from q_flow.cashflow import CashflowCalculator
         from q_flow.models.activity import effective_activity_mode
 
@@ -58,12 +58,6 @@ class Cashflow(db.Model, BaseMixin):
             activity for activity in self.activities if not activity.is_deleted
         ]
         calculator = CashflowCalculator(self)
-        activities = []
-        for activity in active_activities:
-            data = activity.as_dict()
-            data["cash_flow_json"] = calculator.activity_cashflows[activity.id]
-            activities.append(data)
-
         snapshot = calculator.snapshot()
         work_activities = [
             activity
@@ -151,6 +145,10 @@ class Cashflow(db.Model, BaseMixin):
             "work_duration": snapshot["duration"],
             "dlp": self.dlp or 0,
             "financial_horizon": len(snapshot["outflow_with_interest"]),
+            "contractor_contribution": 0.0,
+            "peak_unfunded_shortfall": round(max(
+                0.0, -min(snapshot["outflow_with_interest"], default=0.0)
+            ), 2),
         }
         if facility_rows:
             unfunded = snapshot.get("unfunded_shortfall", [])
@@ -166,6 +164,50 @@ class Cashflow(db.Model, BaseMixin):
                 "peak_unfunded_shortfall": round(max(unfunded, default=0.0), 2),
             })
 
+        if not include_details:
+            contract_fields = (
+                "contract_value", "advance", "retention", "release_retention_eop",
+                "dlp", "duration_for_payment",
+            )
+            forecast_fields = (
+                "wieb", "interest_rate", "use_independent_inflow_curve",
+                "inflow_curve_type", "inflow_curve_skew",
+            )
+            facility_fields = (
+                "id", "name", "type", "limit", "interest_rate", "fees",
+                "draw_method", "repayment_method", "advance_portion",
+                "repayment_percent", "revolving", "start", "end",
+                "sweep_priority", "installment_start", "installment_interval",
+                "installment_count",
+            )
+            return {
+                "id": self.id, "unit_id": self.unit_id, "name": self.name,
+                "summary": summary,
+                "properties": {
+                    "contract": {key: getattr(self, key) for key in contract_fields},
+                    "forecast": {key: getattr(self, key) for key in forecast_fields},
+                    "activity_counts": {
+                        "total": len(active_activities), "work": len(work_activities),
+                        "scheduled_cost": len(scheduled_cost_activities),
+                    },
+                    "financing": [
+                        {key: facility[key] for key in facility_fields if key in facility}
+                        for facility in (self.financing_facilities or [])
+                    ],
+                    "units": {
+                        "percentages": "fraction", "period_index_base": 0,
+                        "period_unit": "model_period", "amount_unit": "project_currency",
+                        "interest_rate_basis": "per_model_period",
+                        "periods_per_year": None,
+                    },
+                },
+            }
+
+        activities = []
+        for activity in active_activities:
+            data = activity.as_dict()
+            data["cash_flow_json"] = calculator.activity_cashflows[activity.id]
+            activities.append(data)
         data = super().as_dict()
         data.update({
             "activities": activities,

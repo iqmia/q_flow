@@ -363,6 +363,10 @@ def get_cashflow(user, cashflow_id):
     error = _permission(user, cashflow, VIEW_CASHFLOW)
     if error:
         return error
+    detail = request.args.get("detail", "full")
+    InvalidData.require_condition(detail in {"summary", "full"}, "detail must be summary or full")
+    if detail == "summary":
+        return jsonify(data=cashflow.as_dict_with_activities(include_details=False)), 200
     return jsonify(data=cashflow.as_dict_with_activities()), 200
 
 
