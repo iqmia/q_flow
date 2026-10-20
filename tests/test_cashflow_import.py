@@ -84,6 +84,38 @@ def _import(app, payload):
         )
 
 
+@pytest.mark.parametrize(
+    "pre_work_delay, expected_work_period",
+    [(None, 2), (0, 2), (1, 3)],
+)
+def test_import_activity_prework_defaults_to_zero_unless_explicit(app, pre_work_delay, expected_work_period):
+    payload = _payload()
+    activity = payload["cashflow"]["activities"][0]
+    activity.update(
+        name="One-period task",
+        activity_type="linear",
+        distribution_type="linear",
+        start=1,  # P2 in the user-facing frontend
+        duration=1,
+        cost=100,
+        subcontracted=0,
+    )
+    if pre_work_delay is None:
+        activity.pop("mobilization_period")
+    else:
+        activity["mobilization_period"] = pre_work_delay
+
+    response = _import(app, payload)
+    assert response.status_code == 201
+    scenario = response.get_json()["data"]
+    actual = scenario["activities"][0]
+    assert actual["mobilization_period"] == (pre_work_delay or 0)
+    assert scenario["summary"]["work_duration"] == expected_work_period
+    assert actual["cash_flow_json"]["marginal_work"] == (
+        [0.0] * (expected_work_period - 1) + [100.0]
+    )
+
+
 def test_import_cashflow_creates_complete_scenario_atomically(app):
     result = _import(app, _payload())
 
