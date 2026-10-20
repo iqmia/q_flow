@@ -83,6 +83,7 @@ def test_new_activity_defaults_to_work_s_curve(tmp_path):
 
         assert activity.activity_mode == "work"
         assert activity.distribution_type == "s_curve"
+        assert activity.mobilization_period == 0
         assert activity.cost_schedule_json is None
 
         columns = set(Activity.__table__.columns.keys())
