@@ -192,7 +192,7 @@ class Activity(db.Model, BaseMixin):
 
     # Legacy name retained because the calculation actively uses this as the
     # initial pre-work/no-work period.
-    mobilization_period = db.Column(db.Integer, default=1)
+    mobilization_period = db.Column(db.Integer, default=0)
 
     # Percent subcontracted.
     subcontracted = db.Column(db.Float, default=0.7)
