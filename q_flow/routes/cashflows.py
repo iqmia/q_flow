@@ -24,6 +24,7 @@ from q_flow.services.cashflow_facilities import (
     add_facility,
     delete_facility,
     get_facility,
+    new_facilities_with_defaults,
     normalize_facility_ids,
     set_facility_order,
     update_facility,
@@ -75,6 +76,22 @@ def _set_scalar_defaults(model):
         default = column.default
         if default is not None and default.is_scalar:
             setattr(model, column.key, default.arg)
+
+
+def _restore_created_curve_nulls(cashflow, source):
+    """Restore explicit nullable curve source fields after the INSERT flush.
+
+    New scenarios with omitted fields still use the model's creation defaults.
+    SQLAlchemy applies those INSERT defaults even to supplied Python None, so
+    explicit legacy selector/skew nulls must be restored inside the transaction
+    after insertion and before calculating or returning the scenario snapshot.
+    """
+    for field in (
+        "use_independent_inflow_curve", "inflow_curve_type", "inflow_curve_skew",
+    ):
+        if field in source and source[field] is None:
+            setattr(cashflow, field, None)
+    db.session.flush()
 
 
 def _validate_cashflow(cashflow):
@@ -156,8 +173,10 @@ def _require_text(data, key, label):
     )
 
 
-def _optional_text(data, key, label):
+def _optional_text(data, key, label, *, allow_null=False):
     if key not in data:
+        return
+    if allow_null and data[key] is None:
         return
     InvalidData.require_condition(
         isinstance(data[key], str),
@@ -232,8 +251,14 @@ def new_cashflow(user, unit_id):
     db.session.add(cashflow)
     try:
         _set_scalar_defaults(cashflow)
+        if "financing_facilities" in data:
+            supplied_facilities = data["financing_facilities"]
+            cashflow.financing_facilities = new_facilities_with_defaults(
+                [] if supplied_facilities is None else supplied_facilities
+            )
         _validate_cashflow(cashflow)
         db.session.flush()
+        _restore_created_curve_nulls(cashflow, data)
         snapshot = cashflow.as_dict_with_activities()
         db.session.commit()
     except Exception:
@@ -255,7 +280,7 @@ def import_cashflow(user, unit_id):
     raw = read_data(request)
     cashflow_data, activity_rows = _read_import_payload(raw)
     _require_text(cashflow_data, "name", "Cashflow name")
-    _optional_text(cashflow_data, "description", "Cashflow description")
+    _optional_text(cashflow_data, "description", "Cashflow description", allow_null=True)
 
     user_id = user.get("user_id")
     cashflow = Cashflow().from_dict(
@@ -268,6 +293,11 @@ def import_cashflow(user, unit_id):
 
     try:
         _set_scalar_defaults(cashflow)
+        if "financing_facilities" in cashflow_data:
+            supplied_facilities = cashflow_data["financing_facilities"]
+            cashflow.financing_facilities = new_facilities_with_defaults(
+                [] if supplied_facilities is None else supplied_facilities
+            )
         _validate_cashflow(cashflow)
 
         for row in activity_rows:
@@ -276,10 +306,12 @@ def import_cashflow(user, unit_id):
                 "Each imported activity must be an object",
             )
             _require_text(row, "name", "Activity name")
-            _optional_text(row, "activity_type", "Activity type")
-            _optional_text(row, "activity_mode", "Activity mode")
-            _optional_text(row, "distribution_type", "Activity distribution type")
-            _optional_text(row, "duration_units", "Activity duration units")
+            # Real portable exports preserve legacy nullable strings. Existing
+            # activity normalization below already handles these source nulls.
+            _optional_text(row, "activity_type", "Activity type", allow_null=True)
+            _optional_text(row, "activity_mode", "Activity mode", allow_null=True)
+            _optional_text(row, "distribution_type", "Activity distribution type", allow_null=True)
+            _optional_text(row, "duration_units", "Activity duration units", allow_null=True)
 
             raw_mode = row.get("activity_mode") or "work"
             raw_distribution = row.get("distribution_type")
@@ -311,6 +343,7 @@ def import_cashflow(user, unit_id):
             db.session.add(activity)
 
         db.session.flush()
+        _restore_created_curve_nulls(cashflow, cashflow_data)
         snapshot = cashflow.as_dict_with_activities()
         db.session.commit()
     except Exception:

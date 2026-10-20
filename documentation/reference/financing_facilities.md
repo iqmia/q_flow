@@ -1,6 +1,6 @@
 # Financing Facilities Reference
 
-Last reviewed: 14 October 2026
+Last reviewed: 20 October 2026
 
 This reference describes how CashflowPot financing facilities interact with project cashflow. Project Activities create project inflow/outflow. Facilities sit on top of that project cashflow and create financing inflows, principal repayments, interest, fees, and outstanding balances.
 
@@ -163,6 +163,63 @@ Explicit `scheduled` repayments and `equal_installments` retain their explicit u
 PPC Discount keeps its PPC-issued draw / PPC-receipt repayment semantics because its draw method is `ppc_base`, not `scheduled`.
 
 ## 8. Interest and fees
+
+The preset catalog (`GET /financing-facility-presets`) supplies **editable,
+illustrative simulation assumptions**, not market rates or lender terms:
+
+| Facility type | Interest rate per model period | One-time fixed fee |
+| --- | ---: | ---: |
+| Letter of Credit | 0.005 (0.5%) | Facility value × 0.5% ÷ 12 |
+| Overdraft | 0.005 (0.5%) | Facility value × 0.5% ÷ 12 |
+| PPC Discount | 0.005 (0.5%) | Facility value × 0.5% ÷ 12 |
+| Working Capital | 0.005 (0.5%) | Facility value × 0.5% ÷ 12 |
+| Equipment Loan | 0.005 (0.5%) | Facility value × 0.5% ÷ 12 |
+| Owner's Injection | 0 | 0 |
+| Other / custom type | 0 | 0 |
+
+Interest is a decimal **per model period**, with no calendar duration inferred.
+For example, if the user chooses monthly periods, 6% nominal annual interest
+divided by 12 is `0.005` per month. For any other period basis or contract,
+the user must supply the appropriate period rate.
+
+`fees` is a fixed amount in the cashflow's currency, not a percentage. For new
+bank facilities, an omitted fee is resolved as **facility value × 0.005 ÷ 12**,
+rounded to two decimals. Facility value is the configured limit, including for
+revolving facilities. When no limit is set, scheduled draws use their total
+planned draw amount. For example, a value of 500,000 gives a fee of 208.33.
+The divisor 12 is part of this illustrative default formula; it does not make
+the fee recurring or infer the calendar duration of a model period. The fee is
+charged once at the facility's start.
+
+Unlimited facilities without a scheduled value have no known amount for this
+formula and retain a zero fallback; enter a fee to reflect their financing
+terms. Owner's Injection and Other/custom types retain zero fee defaults.
+The catalog includes `interest_rate_basis = per_period`,
+`fees_basis = fixed_amount`, `default_fees_rate = 0.005 / 12` for bank types
+(zero for Owner's Injection and Other),
+`default_fees_basis = limit_or_scheduled_draw_total`, and `costs_note` to explain
+these assumptions. Catalog `fees = 0` is the unresolved fallback amount, not the
+resolved fee for a bank facility with a known value. Omit `fees` on creation to
+let the backend calculate it.
+These explanation fields are catalog metadata, not additional saved inputs.
+
+New-facility inputs also receive omitted draw method, repayment method, and
+revolving flag from their selected backend type preset, plus `start = 0`.
+An omitted type becomes `Other`; custom types retain their name and use the
+`Other` methods and zero-cost assumption. Explicit method/flag/start overrides
+are retained. Required contract-specific percentages (PPC advance portion and
+PPC repayment percentage), schedules, limits and timing remain user inputs.
+
+Only omitted `interest_rate` and `fees` fields receive these defaults when a
+facility is added through the per-facility API, supplied with a new scenario,
+or imported into a new scenario. Explicit zero and all other entered costs are
+retained. Importing an older portable document with omitted costs therefore
+uses the new-scenario defaults; include explicit zeros to reproduce a no-cost
+assumption. Existing saved scenarios are **not backfilled** on reads, facility
+ID normalization, edits, reordering, exports, or calculation. The engine keeps
+its historical zero-cost behavior for saved facilities that omit cost fields.
+The resolved fixed fee is retained on subsequent limit or schedule edits;
+change `fees` explicitly when revising the fee agreement.
 
 Facility interest is calculated on **opening outstanding principal**.
 

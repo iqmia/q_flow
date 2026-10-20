@@ -8,14 +8,37 @@ Rates and amounts are expressed per model period and in the cashflow currency.
 from math import isfinite
 
 
-FACILITY_PRESETS = (
-    {"key": "letter_of_credit", "type": "Letter of Credit", "draw_method": "scheduled", "repayment_method": "percent_of_ppc", "revolving": False},
-    {"key": "overdraft", "type": "Overdraft", "draw_method": "automatic_shortfall", "repayment_method": "cashflow_sweep", "revolving": True},
-    {"key": "ppc_discount", "type": "PPC Discount", "draw_method": "ppc_base", "repayment_method": "percent_of_ppc", "revolving": False},
-    {"key": "working_capital", "type": "Working Capital", "draw_method": "scheduled", "repayment_method": "percent_of_ppc", "revolving": False},
-    {"key": "equipment_loan", "type": "Equipment Loan", "draw_method": "scheduled", "repayment_method": "scheduled", "revolving": False},
-    {"key": "owners_injection", "type": "Owner's Injection", "draw_method": "automatic_shortfall", "repayment_method": "cashflow_sweep", "revolving": False},
-    {"key": "other", "type": "Other", "draw_method": "scheduled", "repayment_method": "cashflow_sweep", "revolving": False},
+# These are editable simulation assumptions, not lender quotes. No calendar unit
+# is inferred from a model period. New bank fees use facility value * 0.5% / 12,
+# resolved to a one-time currency amount at creation, not a recurring charge.
+FACILITY_PRESETS = tuple(
+    {
+        **preset,
+        "interest_rate_basis": "per_period",
+        "fees_basis": "fixed_amount",
+        "default_fees_rate": 0.005 / 12 if preset["interest_rate"] else 0.0,
+        "default_fees_basis": "limit_or_scheduled_draw_total",
+        "costs_note": (
+            "Editable illustrative simulation costs, not lender terms. Interest "
+            "is a decimal rate per model period; no calendar unit is assumed. "
+            "For bank presets, omitted fees use facility value * 0.5% / 12, "
+            "rounded to two decimals and charged once at start. Value is the "
+            "limit, or scheduled draw total when no limit is set. The catalog's "
+            "fees=0 is the fallback for unknown value; unlimited facilities "
+            "without a scheduled value need an entered fee. Owner's Injection "
+            "and Other/custom types default to zero costs. Replace these "
+            "defaults with lender terms."
+        ),
+    }
+    for preset in (
+        {"key": "letter_of_credit", "type": "Letter of Credit", "draw_method": "scheduled", "repayment_method": "percent_of_ppc", "revolving": False, "interest_rate": 0.005, "fees": 0.0},
+        {"key": "overdraft", "type": "Overdraft", "draw_method": "automatic_shortfall", "repayment_method": "cashflow_sweep", "revolving": True, "interest_rate": 0.005, "fees": 0.0},
+        {"key": "ppc_discount", "type": "PPC Discount", "draw_method": "ppc_base", "repayment_method": "percent_of_ppc", "revolving": False, "interest_rate": 0.005, "fees": 0.0},
+        {"key": "working_capital", "type": "Working Capital", "draw_method": "scheduled", "repayment_method": "percent_of_ppc", "revolving": False, "interest_rate": 0.005, "fees": 0.0},
+        {"key": "equipment_loan", "type": "Equipment Loan", "draw_method": "scheduled", "repayment_method": "scheduled", "revolving": False, "interest_rate": 0.005, "fees": 0.0},
+        {"key": "owners_injection", "type": "Owner's Injection", "draw_method": "automatic_shortfall", "repayment_method": "cashflow_sweep", "revolving": False, "interest_rate": 0.0, "fees": 0.0},
+        {"key": "other", "type": "Other", "draw_method": "scheduled", "repayment_method": "cashflow_sweep", "revolving": False, "interest_rate": 0.0, "fees": 0.0},
+    )
 )
 
 
@@ -350,6 +373,9 @@ def validate_financing_facilities(facilities):
             errors.append(f"{prefix} draw method is invalid")
         if facility.get("repayment_method") not in methods_repay:
             errors.append(f"{prefix} repayment method is invalid")
+        for field in ("start", "interest_rate", "fees"):
+            if field in facility and facility[field] is None:
+                errors.append(f"{prefix} {field.replace('_', ' ')} must not be null")
         for field in ("start", "end"):
             value = facility.get(field)
             if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0):

@@ -6,9 +6,11 @@ without introducing a separate persistence model.
 """
 
 from copy import deepcopy
+from math import isfinite
 from typing import Any, Mapping, Sequence
 
 from q_flow.exceptions import InvalidData, ProjectNotFound
+from q_flow.financing import FACILITY_PRESETS
 from q_flow.services.utils import gen_id
 
 
@@ -25,6 +27,56 @@ def _copy_facilities(facilities: object) -> list[dict[str, Any]]:
         )
         result.append(deepcopy(facility))
     return result
+
+
+def new_facilities_with_defaults(facilities: object) -> list[dict[str, Any]]:
+    """Copy new facility inputs and fill omitted fields from backend presets.
+
+    Use only at explicit creation/import boundaries, never on saved scenario
+    reads, edits or calculation. Explicit zeros and entered costs are preserved.
+    An omitted type and custom facility types use the ``Other`` preset.
+    Contract-specific schedules and percentages remain caller inputs.
+    Catalog explanation metadata is not added to the saved source inputs.
+    """
+    result = _copy_facilities(facilities)
+    fallback = next(item for item in FACILITY_PRESETS if item["key"] == "other")
+    for facility in result:
+        facility.setdefault("type", "Other")
+        preset = next(
+            (item for item in FACILITY_PRESETS if item["type"] == facility.get("type")),
+            fallback,
+        )
+        for field in ("draw_method", "repayment_method", "revolving", "interest_rate"):
+            facility.setdefault(field, preset[field])
+        if "fees" not in facility:
+            facility["fees"] = _default_facility_fee(facility, preset)
+        facility.setdefault("start", 0)
+    return result
+
+
+def _default_facility_fee(facility: Mapping[str, Any], preset: Mapping[str, Any]) -> float:
+    """Resolve a new facility's omitted fee without masking invalid inputs.
+
+    A limit is the facility value, including for revolving scheduled draws.
+    Only unlimited scheduled facilities fall back to their planned draw total.
+    Unknown values retain the catalog fallback; validation handles bad inputs.
+    """
+    rate = preset["default_fees_rate"]
+    if not rate:
+        return preset["fees"]
+
+    def valid_amount(value: Any) -> bool:
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and isfinite(value) and value >= 0)
+
+    value = facility.get("limit")
+    if value is None and facility.get("draw_method") == "scheduled":
+        schedule = facility.get("draw_schedule", {})
+        if isinstance(schedule, dict) and all(valid_amount(item) for item in schedule.values()):
+            value = sum(schedule.values())
+    if not valid_amount(value):
+        return preset["fees"]
+    return round(value * rate, 2)
 
 
 def normalize_facility_ids(
@@ -76,7 +128,7 @@ def add_facility(
         "Financing facility must be an object",
     )
     result, _ = normalize_facility_ids(facilities)
-    new_facility = deepcopy(dict(data))
+    new_facility = new_facilities_with_defaults([dict(data)])[0]
     facility_id = new_facility.get("id")
     if not isinstance(facility_id, str) or not facility_id.strip():
         facility_id = gen_id()

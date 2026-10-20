@@ -92,7 +92,8 @@ financing_facilities
 activities
 ```
 
-`name` must be non-empty text. `description`, when present, must be text.
+`name` must be non-empty text. Optional `description` accepts text or null;
+null descriptions from backend exports are preserved on import.
 
 `interest_rate` is the legacy scenario financing rate used when explicit facilities are not configured. Explicit facility definitions carry their own financing terms.
 
@@ -117,7 +118,11 @@ linear
 
 A null `inflow_curve_skew` is interpreted as balanced `0.0`. It does not disable Independent inflow. Skew is retained but has no calculation effect for a Linear curve.
 
-The three Independent-inflow fields are optional for Version 1 compatibility. When omitted for a newly imported scenario, current scalar defaults are applied.
+The three Independent-inflow fields are optional for Version 1 compatibility.
+When omitted for a new or imported scenario, current scalar defaults are applied.
+Explicit null values are preserved in the saved source: null mode/type selectors
+retain Activity-linked inflow, while null skew has the balanced interpretation
+above.
 
 ## 5. Work in Excess of Billings (WIEB)
 
@@ -179,7 +184,13 @@ Scheduled draw/repayment schedules use period-to-amount maps. They are financing
 
 A blank/null facility limit means unlimited. For finite limits, revolving capacity is based on current outstanding principal while non-revolving capacity is based on cumulative actual draws.
 
-The exact calculation semantics are defined in [`financing_facilities.md`](financing_facilities.md).
+An omitted or null `financing_facilities` list creates an empty facility list
+for a new/imported scenario. Existing saved null lists are not changed on read.
+Newly imported facilities receive omitted type/method/start and illustrative
+cost defaults from the backend presets. Explicit zeros and other entered terms
+are preserved. Include explicit zero interest/fees when transferring a no-cost
+assumption; existing saved scenarios are not backfilled. The exact defaults and
+calculation semantics are defined in [`financing_facilities.md`](financing_facilities.md).
 
 ## 7. Activity object
 
@@ -328,9 +339,13 @@ no_billing_period
 
 ## 8. Version-1 compatibility
 
-The new Activity fields are optional for older Version 1 files.
+The new Activity fields are optional for older Version 1 files. The optional
+strings `activity_type`, `activity_mode`, `distribution_type`, and
+`duration_units` also accept null values emitted by legacy backend exports.
+Import uses the existing activity normalization and scalar defaults for these
+nulls; a legacy `activity_type = "linear"` still selects Linear distribution.
 
-When they are absent:
+When mode/distribution are absent or null:
 
 ```text
 activity_mode = work

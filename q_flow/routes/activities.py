@@ -134,6 +134,11 @@ def _uses_schedule_source(data, activity=None):
 
 
 def _require_activity_source_fields(data, activity=None):
+    if activity is not None:
+        # PUT accepts partial edits: required source values may already exist
+        # on the saved activity. Explicit invalid replacements still reach the
+        # same source and final-state validation as complete submissions.
+        data = {**activity.as_dict(), **data}
     check_required(data, ["name"])
     MissingData.require_condition(data.get("name"), "Missing activity name")
     if not _uses_schedule_source(data, activity):
@@ -309,7 +314,7 @@ def delete_activity(user, activity_id):
 def hard_delete_activity(user, activity_id):
     log.info(f"{user.get('name')} requested to hard delete activity {activity_id}")
     activity = Activity.query.get(activity_id)
-    PermissionDenied.require_condition(activity, "Activity not found")
+    ProjectNotFound.require_condition(activity, "Activity not found")
     cashflow = activity.cashflow
     error = _permission_error(user, cashflow, EDIT_CASHFLOW)
     if error:

@@ -281,3 +281,177 @@ def test_import_cashflow_rejects_non_text_name_without_partial_rows(app):
     with app.app_context():
         assert Cashflow.query.count() == 0
         assert Activity.query.count() == 0
+
+
+@pytest.mark.parametrize("legacy_type", [None, "linear"])
+def test_real_export_of_legacy_null_activity_fields_can_be_imported(app, legacy_type):
+    legacy_fields = ("activity_mode", "distribution_type", "duration_units")
+    with app.app_context():
+        cashflow = Cashflow(id="legacy-cf", unit_id="unit-1", name="Legacy",
+                            contract_value=100, created_by="owner-1").commit()
+        activity = Activity(id="legacy-work", cashflow_id=cashflow.id, name="Work",
+                            cost=100, duration=2, created_by="owner-1").commit()
+        # Persist genuine legacy nulls after insert so ORM insertion defaults
+        # cannot replace them before the real export route is exercised.
+        for field in legacy_fields:
+            setattr(activity, field, None)
+        activity.activity_type = legacy_type
+        db.session.commit()
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        original = app.test_client().get("/cashflow/legacy-cf", headers=_auth()).get_json()["data"]
+        exported = app.test_client().get("/cashflow/legacy-cf/export", headers=_auth())
+    assert exported.status_code == 200
+    source = exported.get_json()
+    assert source["cashflow"]["description"] is None
+    for field in legacy_fields:
+        assert source["cashflow"]["activities"][0][field] is None
+    assert source["cashflow"]["activities"][0]["activity_type"] == legacy_type
+
+    response = _import(app, source)
+
+    assert response.status_code == 201, response.get_json()
+    imported = response.get_json()["data"]
+    for field in ("workflow", "inflow", "outflow", "netflow", "outflow_with_interest"):
+        assert imported[field] == original[field]
+    assert imported["activities"][0]["distribution_type"] == (
+        "linear" if legacy_type == "linear" else "s_curve"
+    )
+    with app.app_context():
+        saved_legacy = db.session.get(Activity, "legacy-work")
+        assert saved_legacy.activity_mode is None
+        assert saved_legacy.distribution_type is None
+
+
+@pytest.mark.parametrize("field", [
+    "activity_type", "activity_mode", "distribution_type", "duration_units",
+])
+def test_nullable_legacy_import_strings_still_reject_non_text_values(app, field):
+    payload = _payload()
+    payload["cashflow"]["activities"][0][field] = []
+    assert _import(app, payload).status_code == 400
+    with app.app_context():
+        assert Cashflow.query.count() == 0
+        assert Activity.query.count() == 0
+
+
+def test_import_preserves_nullable_optional_description(app):
+    payload = _payload()
+    payload["cashflow"]["description"] = None
+    response = _import(app, payload)
+    assert response.status_code == 201
+    assert response.get_json()["data"]["description"] is None
+
+
+def test_import_still_rejects_non_text_optional_description(app):
+    payload = _payload()
+    payload["cashflow"]["description"] = []
+    assert _import(app, payload).status_code == 400
+
+
+def test_real_export_with_nullable_facilities_imports_as_empty_without_editing_source(app):
+    created = _import(app, _payload()).get_json()["data"]
+    with app.app_context():
+        source = db.session.get(Cashflow, created["id"])
+        source.financing_facilities = None
+        db.session.commit()
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        exported = app.test_client().get(f"/cashflow/{created['id']}/export", headers=_auth())
+    assert exported.get_json()["cashflow"]["financing_facilities"] is None
+
+    response = _import(app, exported.get_json())
+
+    assert response.status_code == 201, response.get_json()
+    assert response.get_json()["data"]["financing_facilities"] == []
+    with app.app_context():
+        assert db.session.get(Cashflow, created["id"]).financing_facilities is None
+        assert db.session.get(Cashflow, response.get_json()["data"]["id"]).financing_facilities == []
+
+
+def test_direct_new_cashflow_accepts_nullable_facility_list_as_empty(app):
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        response = app.test_client().post(
+            "/project/unit-1/cashflows", headers=_auth(),
+            json={"name": "No facilities", "financing_facilities": None},
+        )
+    assert response.status_code == 201, response.get_json()
+    assert response.get_json()["data"]["financing_facilities"] == []
+
+
+@pytest.mark.parametrize("creation", ["new", "import"])
+@pytest.mark.parametrize("settings", [
+    {"use_independent_inflow_curve": None},
+    {"inflow_curve_type": None},
+    {"inflow_curve_skew": None},
+    {"use_independent_inflow_curve": None, "inflow_curve_type": None, "inflow_curve_skew": None},
+])
+def test_explicit_nullable_curve_fields_are_preserved_at_creation(app, creation, settings):
+    payload = _payload()
+    payload["cashflow"].update(settings)
+    if creation == "import":
+        response = _import(app, payload)
+    else:
+        source = {key: value for key, value in payload["cashflow"].items() if key != "activities"}
+        with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+            response = app.test_client().post(
+                "/project/unit-1/cashflows", headers=_auth(), json=source,
+            )
+    assert response.status_code == 201, response.get_json()
+    saved = response.get_json()["data"]
+    with app.app_context():
+        stored = db.session.get(Cashflow, saved["id"])
+        for field in settings:
+            assert saved[field] is None
+            assert getattr(stored, field) is None
+        defaults = {"use_independent_inflow_curve": True, "inflow_curve_type": "s_curve", "inflow_curve_skew": 0.0}
+        for field, value in defaults.items():
+            if field not in settings:
+                assert saved[field] == value
+
+
+@pytest.mark.parametrize("creation", ["new", "import"])
+def test_real_legacy_null_curve_roundtrip_retains_activity_linked_calculation(app, creation):
+    curve_fields = ("use_independent_inflow_curve", "inflow_curve_type", "inflow_curve_skew")
+    with app.app_context():
+        cashflow = Cashflow(id="legacy-linked", unit_id="unit-1", name="Legacy linked",
+                            created_by="owner-1", contract_value=100, advance=0, retention=0,
+                            dlp=0, duration_for_payment=0, interest_rate=0, wieb=0).commit()
+        Activity(cashflow_id=cashflow.id, name="Delayed work", created_by="owner-1",
+                 activity_type="linear", cost=100, duration=2, start=2, advance=0,
+                 retention=0, dlp=0, duration_for_payment=0, work_in_excess=0,
+                 mobilization_period=0, subcontracted=0, skew=0, no_billing_period=0).commit()
+        independent = cashflow.as_dict_with_activities()
+        for field in curve_fields:
+            setattr(cashflow, field, None)
+        db.session.commit()
+        original = cashflow.as_dict_with_activities()
+    # Delayed activity work starts in period 2; independent work spans the
+    # entire four-period work horizon, so changing selector nulls is observable.
+    assert original["inflow"][:2] == [0.0, 0.0]
+    assert independent["inflow"] != original["inflow"]
+    with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+        exported = app.test_client().get("/cashflow/legacy-linked/export", headers=_auth()).get_json()
+    for field in curve_fields:
+        assert exported["cashflow"][field] is None
+    if creation == "import":
+        response = _import(app, exported)
+        assert response.status_code == 201, response.get_json()
+        recreated = response.get_json()["data"]
+    else:
+        source = {key: value for key, value in exported["cashflow"].items() if key != "activities"}
+        with patch("q_flow.routes.cashflows.ensure_unit_permission", _permission()):
+            response = app.test_client().post("/project/unit-1/cashflows", headers=_auth(), json=source)
+        assert response.status_code == 201, response.get_json()
+        with patch("q_flow.routes.activities.ensure_unit_permission", _permission()):
+            added = app.test_client().post(
+                f"/new_activity/{response.get_json()['data']['id']}", headers=_auth(),
+                json=exported["cashflow"]["activities"][0],
+            )
+        assert added.status_code == 201, added.get_json()
+        recreated = added.get_json()["cashflow"]
+    for field in curve_fields:
+        assert recreated[field] is None
+    for field in ("workflow", "inflow", "outflow", "netflow", "outflow_with_interest"):
+        assert recreated[field] == original[field]
+    with app.app_context():
+        for field in curve_fields:
+            assert getattr(db.session.get(Cashflow, "legacy-linked"), field) is None
