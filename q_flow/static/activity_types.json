@@ -77,7 +77,7 @@
         "duration_for_payment": 1,
         "work_in_excess": 0.5,
         "no_billing_period": 4,
-        "mobilization_period": 6
+        "mobilization_period": 0
     },
     "facade": {
         "type": "facade",
@@ -93,7 +93,7 @@
         "duration_for_payment": 2,
         "work_in_excess": 0.3,
         "no_billing_period": 4,
-        "mobilization_period": 5
+        "mobilization_period": 0
     },
     "mep": {
         "type": "mep",
@@ -109,7 +109,7 @@
         "duration_for_payment": 2,
         "work_in_excess": 0.3,
         "no_billing_period": 3,
-        "mobilization_period": 5
+        "mobilization_period": 0
     },
     "steel": {
         "type": "steel",
@@ -125,7 +125,7 @@
         "duration_for_payment": 2,
         "work_in_excess": 0.3,
         "no_billing_period": 3,
-        "mobilization_period": 1
+        "mobilization_period": 0
     },
     "finishing": {
         "type": "finishing",
@@ -141,7 +141,7 @@
         "duration_for_payment": 1,
         "work_in_excess": 0.4,
         "no_billing_period": 1,
-        "mobilization_period": 1
+        "mobilization_period": 0
     },
     "generalLine": {
         "type": "general",
