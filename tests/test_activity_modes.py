@@ -94,6 +94,16 @@ def test_new_activity_defaults_to_work_s_curve(tmp_path):
         assert "compounding_period" not in columns
 
 
+def test_activity_type_presets_have_no_implicit_prework_delay():
+    import json
+    from pathlib import Path
+
+    presets_file = Path(__file__).resolve().parents[1] / "q_flow" / "static" / "activity_types.json"
+    presets = json.loads(presets_file.read_text(encoding="utf-8"))
+    assert presets
+    assert all(preset.get("mobilization_period", 0) == 0 for preset in presets.values())
+
+
 def test_legacy_linear_inference_when_new_fields_are_null():
     from q_flow.models.activity import (
         Activity,
