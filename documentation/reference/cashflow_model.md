@@ -898,7 +898,7 @@ Clients mirror useful validation for UX, but backend rules remain authoritative.
 | DLP | 0 |
 | Subcontract payment period | 1 period |
 | Subcontract WIEB assumption | 10% |
-| Pre-work period (`mobilization_period`) | 1 period |
+| Pre-work period (`mobilization_period`) | 0 periods |
 | Subcontracted share | 70% |
 | Skew | `0.0` |
 | No-billing period | 0 |
